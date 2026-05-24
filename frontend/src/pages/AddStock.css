@@ -1,0 +1,50 @@
+.add-stock { max-width:960px; }
+.as-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; }
+.as-tab { padding:9px 20px; font-size:13px; color:var(--text-2); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.15s; }
+.as-tab.active { color:var(--green); border-bottom-color:var(--green); font-weight:600; }
+
+.as-form-wrap { display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start; }
+@media(max-width:800px){ .as-form-wrap { grid-template-columns:1fr; } }
+.as-form { background:#fff; border-radius:var(--radius-lg); padding:24px; box-shadow:var(--shadow); }
+.form-section-title { font-size:13px; font-weight:600; margin-bottom:16px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.04em; }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.fg-2 { grid-column:span 2; }
+.field-label { display:block; font-size:12px; font-weight:500; color:var(--text-2); margin-bottom:4px; }
+.field-input { width:100%; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; background:#fff; color:var(--text); outline:none; transition:border 0.15s; }
+.field-input:focus { border-color:var(--green); }
+
+.as-error { background:var(--red-lt); color:var(--red); padding:10px 12px; border-radius:8px; font-size:13px; margin-top:12px; }
+.as-actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+.as-add-btn { padding:9px 18px; border-radius:9px; border:1.5px solid var(--green); color:var(--green); font-size:13px; font-weight:600; background:#fff; transition:all 0.15s; }
+.as-add-btn:hover { background:var(--green-lt); }
+.as-submit-btn { padding:9px 20px; border-radius:9px; background:var(--green); color:#fff; font-size:13px; font-weight:600; transition:background 0.15s; }
+.as-submit-btn:hover:not(:disabled) { background:var(--green-dk); }
+.as-submit-btn:disabled { opacity:0.6; }
+
+.as-queue { background:#fff; border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow); }
+.queue-list { display:flex; flex-direction:column; gap:8px; }
+.queue-item { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--gray-lt); border-radius:8px; }
+.qi-name { font-size:13px; font-weight:500; }
+.qi-detail { font-size:11px; color:var(--text-2); margin-top:1px; }
+.qi-remove { color:var(--text-2); font-size:14px; padding:4px; border-radius:4px; }
+.qi-remove:hover { background:var(--border); }
+
+.csv-wrap { max-width:600px; }
+.csv-box { background:#fff; border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px; text-align:center; }
+.csv-icon { font-size:40px; margin-bottom:12px; }
+.csv-title { font-size:16px; font-weight:600; margin-bottom:6px; }
+.csv-sub  { font-size:13px; color:var(--text-2); margin-bottom:20px; }
+.csv-btn { display:inline-block; padding:9px 22px; background:var(--green); color:#fff; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; }
+.csv-hint { font-size:11px; color:var(--gray); margin-top:12px; }
+.csv-preview { margin-top:20px; background:#fff; border-radius:var(--radius-lg); padding:16px; box-shadow:var(--shadow); }
+.csv-preview-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-size:13px; font-weight:500; }
+.preview-table-wrap { overflow-x:auto; }
+.preview-table { width:100%; border-collapse:collapse; font-size:12px; }
+.preview-table th { text-align:left; padding:7px 10px; background:var(--gray-lt); font-weight:600; font-size:11px; color:var(--text-2); }
+.preview-table td { padding:7px 10px; border-bottom:1px solid var(--border); }
+.preview-more { font-size:11px; color:var(--text-2); margin-top:8px; }
+
+.as-result { margin-top:20px; background:var(--green-lt); border:1px solid var(--green); border-radius:var(--radius); padding:16px 18px; }
+.as-result h3 { font-size:14px; font-weight:600; color:var(--green-dk); margin-bottom:4px; }
+.as-result p  { font-size:13px; color:var(--text-2); }
+.as-result a  { color:var(--green); font-weight:500; }

@@ -1,0 +1,32 @@
+.inv-page {}
+.inv-filters { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.filter-input { padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; background:#fff; color:var(--text); outline:none; min-width:180px; }
+.filter-input:focus { border-color:var(--green); }
+.pred-btn { padding:9px 18px; border-radius:9px; background:var(--green-lt); color:var(--green); font-size:13px; font-weight:600; border:1.5px solid var(--green); transition:all 0.15s; }
+.pred-btn:hover:not(:disabled) { background:var(--green); color:#fff; }
+.pred-btn:disabled { opacity:0.6; }
+
+.inv-table-wrap { overflow-x:auto; background:#fff; border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+.inv-table { width:100%; border-collapse:collapse; font-size:12.5px; white-space:nowrap; }
+.inv-table th { background:var(--gray-lt); padding:10px 12px; text-align:left; font-size:11px; font-weight:600; color:var(--text-2); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:1; }
+.inv-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+.inv-table tr:last-child td { border-bottom:none; }
+.inv-table tr:hover td { background:#fafbfc; }
+.td-name { font-weight:500; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.td-cat  { color:var(--text-2); max-width:140px; overflow:hidden; text-overflow:ellipsis; }
+.td-urgent { color:var(--red); font-weight:600; }
+.td-del { color:var(--gray); font-size:13px; padding:3px 6px; border-radius:4px; }
+.td-del:hover { background:var(--red-lt); color:var(--red); }
+
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-green { background:#E6F5EF; color:#0F5440; }
+.badge-amber { background:var(--amber-lt); color:#7A4F00; }
+.badge-red   { background:var(--red-lt); color:var(--red); }
+.badge-dark  { background:#2D1B1B; color:#FFAAAA; }
+.badge-gray  { background:var(--gray-lt); color:var(--gray); }
+
+.pager { display:flex; align-items:center; gap:12px; justify-content:center; margin-top:16px; }
+.pg-btn { padding:7px 16px; border-radius:8px; border:1.5px solid var(--border); font-size:13px; background:#fff; transition:all 0.15s; }
+.pg-btn:hover:not(:disabled) { border-color:var(--green); color:var(--green); }
+.pg-btn:disabled { opacity:0.4; }
+.pg-info { font-size:13px; color:var(--text-2); }

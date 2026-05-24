@@ -1,0 +1,39 @@
+.pred-page {}
+.pred-run-btn { padding:9px 18px; border-radius:9px; background:var(--green); color:#fff; font-size:13px; font-weight:600; transition:background 0.15s; }
+.pred-run-btn:hover:not(:disabled) { background:var(--green-dk); }
+.pred-run-btn:disabled { opacity:0.6; }
+
+.pred-filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.pf-btn { padding:7px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:12px; background:#fff; color:var(--text-2); transition:all 0.15s; display:flex; align-items:center; gap:6px; }
+.pf-btn:hover  { border-color:var(--green); color:var(--green); }
+.pf-btn.active { background:var(--green); color:#fff; border-color:var(--green); }
+.pf-count { font-size:11px; background:rgba(0,0,0,0.1); padding:1px 6px; border-radius:10px; }
+.pf-btn.active .pf-count { background:rgba(255,255,255,0.25); }
+
+.pred-list { display:flex; flex-direction:column; gap:10px; }
+.pred-card { background:#fff; border-radius:var(--radius-lg); box-shadow:var(--shadow); overflow:hidden; border:1.5px solid var(--border); }
+.pred-bad  { border-color:#fbc4be; }
+.pred-good { border-color:#a8dfc9; }
+.pred-top { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; flex-wrap:wrap; }
+.pred-top:hover { background:var(--gray-lt); }
+.pred-left  { flex:1; min-width:180px; }
+.pred-name  { font-size:14px; font-weight:600; }
+.pred-cat   { font-size:11px; color:var(--text-2); margin-top:2px; }
+.pred-badges { display:flex; gap:6px; flex-wrap:wrap; }
+.pb { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+.pb-warn { background:#fdecea; color:var(--red); }
+.pb-ok   { background:#e6f5ef; color:var(--green-dk); }
+.pred-chevron { font-size:11px; color:var(--text-2); }
+
+.pred-body { padding:0 16px 16px; border-top:1px solid var(--border); }
+.pred-gauges { margin:14px 0; display:flex; flex-direction:column; gap:8px; }
+.gauge-row   { display:flex; align-items:center; gap:10px; }
+.gauge-label { font-size:12px; color:var(--text-2); width:130px; flex-shrink:0; }
+.gauge-track { flex:1; height:8px; background:var(--gray-lt); border-radius:4px; overflow:hidden; }
+.gauge-fill  { height:100%; border-radius:4px; transition:width 0.4s; }
+.gauge-val   { font-size:12px; font-weight:600; width:38px; text-align:right; }
+
+.pred-recs { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.pred-rec  { font-size:12px; background:var(--green-lt); color:var(--green-dk); padding:8px 12px; border-radius:8px; border-left:3px solid var(--green); line-height:1.5; }
+.pred-meta { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--text-2); padding-top:10px; border-top:1px solid var(--border); }
+.pred-meta strong { color:var(--text); }
