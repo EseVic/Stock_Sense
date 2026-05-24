@@ -1,0 +1,37 @@
+product_name,category,purchase_frequency,total_units_bought,total_revenue_ngn,avg_qty_per_txn,unique_cities,customer_preference
+Milo 400g,Beverages,606,3230,6190354,5.33,15,High
+Wheat Flour 5kg,Grains & Cereals,603,3119,6473952,5.17,15,High
+Palm Oil 4L,Condiments & Seasonings,601,3210,6748142,5.34,15,High
+Palm Oil 2L,Cooking Oils & Fats,593,3376,6515952,5.69,15,High
+Dangote Noodles 70g,Pasta & Noodles,587,3131,6191873,5.33,15,High
+Plantain Bunch,Fresh & Perishable,586,3252,6149115,5.55,15,High
+Pampers Small 36pk,Baby & Infant,581,3167,6184403,5.45,15,High
+Bleach 1L,Household Essentials,570,3130,5636778,5.49,15,High
+Gala Sausage Roll,Snacks & Confectionery,570,3084,5901495,5.41,15,High
+Peak Milk Tin 400g,Beverages,569,3015,6009664,5.3,15,High
+Chin-Chin 500g,Snacks & Confectionery,567,3054,6281646,5.39,15,High
+Geisha Sardines 125g,Canned & Packaged Foods,567,3155,6574120,5.56,15,High
+Tomato Paste 400g,Condiments & Seasonings,563,2886,6155315,5.13,15,Medium
+Maggi Cubes 40pk,Condiments & Seasonings,561,3123,6188275,5.57,15,Medium
+Dettol Antiseptic 500ml,Personal Care,557,2956,5801752,5.31,15,Medium
+Hollandia Yoghurt 1L,Beverages,556,3086,5894903,5.55,15,Medium
+Onions 1kg,Fresh & Perishable,556,3095,6141776,5.57,15,Medium
+Cerelac Wheat 400g,Baby & Infant,555,2921,5807120,5.26,15,Medium
+Golden Penny Spaghetti 500g,Pasta & Noodles,555,2860,5805410,5.15,15,Medium
+Gino Tomatoes 400g,Canned & Packaged Foods,552,2963,5744557,5.37,15,Medium
+Egusi Ground 500g,Condiments & Seasonings,552,2870,5656665,5.2,15,Medium
+Cornedbeef 340g,Canned & Packaged Foods,549,3048,5667012,5.55,15,Medium
+Beans Brown 5kg,Grains & Cereals,548,2963,6045093,5.41,15,Medium
+Eggs Crate 30,Fresh & Perishable,544,2902,5576055,5.33,15,Medium
+NAN Optipro 400g,Baby & Infant,542,2953,5610017,5.45,15,Low
+Pringles Original 150g,Snacks & Confectionery,540,2845,5675885,5.27,15,Low
+Tissue Paper 12 rolls,Household Essentials,539,2783,5211983,5.16,15,Low
+Indomie Noodles 70g,Snacks & Confectionery,533,2895,5587939,5.43,15,Low
+Huggies Medium 32pk,Baby & Infant,533,2766,5016090,5.19,15,Low
+Rice 50kg,Grains & Cereals,531,2848,5636104,5.36,15,Low
+Vegetable Oil 5L,Cooking Oils & Fats,529,2972,5541507,5.62,15,Low
+Custard Powder 400g,Canned & Packaged Foods,527,2740,5587868,5.2,15,Low
+Garri Yellow 10kg,Grains & Cereals,527,2749,5270058,5.22,15,Low
+Coca-Cola Crate 24,Beverages,526,2780,5572437,5.29,15,Low
+Fresh Tomatoes 1kg,Fresh & Perishable,513,2743,5428455,5.35,15,Low
+Omo Detergent 1kg,Personal Care,512,2627,5230867,5.13,15,Low
