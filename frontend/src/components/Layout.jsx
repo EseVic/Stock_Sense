@@ -4,14 +4,14 @@ import { useAuth } from '../context/AuthContext'
 import './Layout.css'
 
 const NAV = [
-  { to:'/',                icon:'⊞', label:'Dashboard'       },
-  { to:'/inventory',       icon:'◫', label:'Inventory'        },
-  { to:'/add-stock',       icon:'＋', label:'Add Stock'        },
-  { to:'/predictions',     icon:'◎', label:'Predictions'      },
-  { to:'/metrics',         icon:'≋', label:'Model Metrics'    },
-  { to:'/suppliers',       icon:'🏭', label:'Suppliers'        },
-  { to:'/purchase-orders', icon:'🛒', label:'Purchase Orders'  },
-  { to:'/sales-history',   icon:'📈', label:'Sales History'    },
+  { to:'/app',                 icon:'⊞', label:'Dashboard'       },
+  { to:'/app/inventory',       icon:'◫', label:'Inventory'        },
+  { to:'/app/add-stock',       icon:'＋', label:'Add Stock'        },
+  { to:'/app/predictions',     icon:'◎', label:'Predictions'      },
+  { to:'/app/metrics',         icon:'≋', label:'Model Metrics'    },
+  { to:'/app/suppliers',       icon:'🏭', label:'Suppliers'        },
+  { to:'/app/purchase-orders', icon:'🛒', label:'Purchase Orders'  },
+  { to:'/app/sales-history',   icon:'📈', label:'Sales History'    },
 ]
 
 function getInitialDark() {
@@ -25,16 +25,13 @@ export default function Layout() {
   const [dark,        setDark]        = useState(getInitialDark)
   const [drawerOpen,  setDrawerOpen]  = useState(false)
 
-  // sync dark mode with <html> and localStorage
   useEffect(() => {
     document.documentElement.classList.toggle('app-dark', dark)
     try { localStorage.setItem('ss_dark', dark) } catch {}
   }, [dark])
 
-  // close drawer on route change
   useEffect(() => { setDrawerOpen(false) }, [location.pathname])
 
-  // close drawer on outside click
   useEffect(() => {
     if (!drawerOpen) return
     const close = e => { if (!e.target.closest('.mobile-drawer') && !e.target.closest('.mob-menu-btn')) setDrawerOpen(false) }
@@ -60,7 +57,7 @@ export default function Layout() {
 
         <nav className="sidebar-nav">
           {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.to==='/'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+            <NavLink key={n.to} to={n.to} end={n.to==='/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
               <span className="nav-icon">{n.icon}</span>
               <span>{n.label}</span>
             </NavLink>
@@ -118,7 +115,7 @@ export default function Layout() {
 
         <nav className="drawer-nav">
           {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.to==='/'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+            <NavLink key={n.to} to={n.to} end={n.to==='/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
               <span className="nav-icon">{n.icon}</span>
               <span>{n.label}</span>
             </NavLink>

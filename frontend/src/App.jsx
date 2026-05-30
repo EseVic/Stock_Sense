@@ -27,8 +27,8 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          Landing page
-          <Route path="/landing" element={<Landing />} />
+          {/* Landing page — default route */}
+          <Route path="/" element={<Landing />} />
 
           {/* Public auth pages */}
           <Route path="/login"           element={<Login />} />
@@ -38,7 +38,7 @@ export default function App() {
           <Route path="/verify-email"    element={<VerifyEmail />} />
 
           {/* Protected app pages */}
-          <Route path="/" element={<Protected><Layout /></Protected>}>
+          <Route path="/app" element={<Protected><Layout /></Protected>}>
             <Route index                    element={<Dashboard />} />
             <Route path="inventory"         element={<Inventory />} />
             <Route path="add-stock"         element={<AddStock />} />
@@ -48,7 +48,7 @@ export default function App() {
             <Route path="purchase-orders"   element={<PurchaseOrders />} />
             <Route path="sales-history"     element={<SalesHistory />} />
           </Route>
-          
+
         </Routes>
       </BrowserRouter>
     </AuthProvider>

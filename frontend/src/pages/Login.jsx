@@ -19,7 +19,7 @@ export default function Login() {
     setError(''); setUnverified(null); setLoading(true)
     try {
       await login(form.email, form.password)
-      nav('/') 
+      nav('/app')
     } catch(e) {
       const data = e.response?.data
       if (data?.requiresVerification) {
@@ -44,7 +44,7 @@ export default function Login() {
     <div className="auth-wrap">
       <div className="auth-left">
         {/* ── back to landing ── */}
-        <Link to="/landing" className="auth-back">
+        <Link to="/" className="auth-back">
           <span className="auth-back-arrow">←</span>
           Back to home
         </Link>
