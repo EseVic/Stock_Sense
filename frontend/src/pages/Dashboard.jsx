@@ -20,7 +20,7 @@ function StatCard({ label, value, sub, color='var(--green)', icon }) {
   )
 }
 
-// renders a clean legend below the pie, never clipped
+// renders a clean legend below the pie — pure HTML, never clipped
 function PieLegend({ data }) {
   return (
     <div className="pie-legend">
@@ -73,6 +73,7 @@ export default function Dashboard() {
       <div className="stat-grid">
         <StatCard label="Total records"  value={stats.total}      sub="inventory batches"        icon="📋" color="var(--green)" />
         <StatCard label="High / Expired" value={stats.highRisk}   sub="need immediate attention" icon="⚠️" color="var(--red)" />
+        <StatCard label="Low stock" value={stats.lowStock?.length||0} sub="need restocking soon" icon="📉" color="var(--amber)" />
         <StatCard label="Slow movers"    value={stats.slowMovers} sub="not selling fast enough"  icon="🐢" color="var(--amber)" />
         <StatCard label="Total revenue"  value={"₦"+Number(stats.revenue||0).toLocaleString()} sub="from sold stock" icon="₦" color="var(--green)" />
       </div>
