@@ -1,6 +1,5 @@
 const axios      = require("axios");
-const { ml }     = require("../config");
-const ML_URL     = ml.url;
+const { ML_URL } = require("../config");
 
 const MLController = {
   async train(req, res) {
