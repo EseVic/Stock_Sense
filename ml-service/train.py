@@ -51,6 +51,8 @@ TASK_FEATURES = {
         "days_to_expiry",
         "shelf_utilisation",
         "weekly_sales_rate",
+        "purchase_frequency",
+        "total_units_sold_all",
     ],
     "slow_mover": BASE_FEATURES + [
         "days_to_expiry",
@@ -72,9 +74,6 @@ TARGET_COLS = ["expiry_risk", "sales_velocity", "customer_preference", "slow_mov
 def load_data():
     paths = [
         "data/Stocksense-Inventory.csv",
-        "../data/Stocksense-Inventory.csv",
-        "data/inventory_cleaned.csv",
-        "../data/inventory_cleaned.csv",
     ]
     for p in paths:
         if os.path.exists(p):

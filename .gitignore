@@ -1,6 +1,6 @@
 .env
 node_modules
-ml-service/models/*.pkl
+# ml-service/models/*.pkl
 ml-service/venv/
 
 
@@ -14,7 +14,7 @@ frontend/dist/
 
 # ML Service
 ml-service/venv/
-ml-service/models/*.pkl
+# ml-service/models/*.pkl
 ml-service/__pycache__/
 
 # Data (large files — consider Git LFS)
