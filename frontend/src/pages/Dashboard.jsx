@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import './Dashboard.css'
 
-const RISK_COLORS  = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#4A1A1A' }
-const VEL_COLORS   = { Slow:'#C0392B', Moderate:'#C47D0E', Fast:'#1B7A5A' }
+const RISK_COLORS = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#4A1A1A' }
+const VEL_COLORS  = { Slow:'#C0392B', Moderate:'#C47D0E', Fast:'#1B7A5A' }
 
 function StatCard({ label, value, sub, color='var(--green)', icon }) {
   return (
@@ -20,16 +20,35 @@ function StatCard({ label, value, sub, color='var(--green)', icon }) {
   )
 }
 
+// renders a clean legend below the pie, never clipped
+function PieLegend({ data }) {
+  return (
+    <div className="pie-legend">
+      {data.map((entry, i) => (
+        <div key={i} className="pie-legend-item">
+          <span className="pie-legend-dot" style={{ background: entry.fill }} />
+          <span className="pie-legend-text">
+            {entry.name}: <strong>{entry.value}</strong>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const [stats, setStats]   = useState(null)
+  const [stats,   setStats]   = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    axios.get('/api/stats').then(r => setStats(r.data)).catch(()=>setStats(null)).finally(()=>setLoading(false))
+    axios.get('/api/stats')
+      .then(r => setStats(r.data))
+      .catch(() => setStats(null))
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <div className="loading">Loading dashboard…</div>
-  if (!stats || stats.total===0) return (
+  if (!stats || stats.total === 0) return (
     <div className="empty-dash">
       <div className="empty-icon">📦</div>
       <h2>No inventory data yet</h2>
@@ -38,8 +57,8 @@ export default function Dashboard() {
     </div>
   )
 
-  const riskData = Object.entries(stats.byRisk||{}).map(([k,v])=>({ name:k, value:v, fill:RISK_COLORS[k]||'#888' }))
-  const velData  = Object.entries(stats.byVel||{}).map(([k,v])=>({ name:k, value:v, fill:VEL_COLORS[k]||'#888' }))
+  const riskData = Object.entries(stats.byRisk || {}).map(([k,v]) => ({ name:k, value:v, fill:RISK_COLORS[k]||'#888' }))
+  const velData  = Object.entries(stats.byVel  || {}).map(([k,v]) => ({ name:k, value:v, fill:VEL_COLORS[k] ||'#888' }))
 
   return (
     <div className="dash">
@@ -52,22 +71,22 @@ export default function Dashboard() {
       </div>
 
       <div className="stat-grid">
-        <StatCard label="Total records"    value={stats.total}     sub="inventory batches"          icon="📋" color="var(--green)" />
-        <StatCard label="High / Expired"   value={stats.highRisk}  sub="need immediate attention"   icon="⚠️" color="var(--red)" />
-        <StatCard label="Slow movers"      value={stats.slowMovers} sub="not selling fast enough"   icon="🐢" color="var(--amber)" />
-        <StatCard label="Total revenue"    value={"₦"+Number(stats.revenue||0).toLocaleString()} sub="from sold stock" icon="₦" color="var(--green)" />
+        <StatCard label="Total records"  value={stats.total}      sub="inventory batches"        icon="📋" color="var(--green)" />
+        <StatCard label="High / Expired" value={stats.highRisk}   sub="need immediate attention" icon="⚠️" color="var(--red)" />
+        <StatCard label="Slow movers"    value={stats.slowMovers} sub="not selling fast enough"  icon="🐢" color="var(--amber)" />
+        <StatCard label="Total revenue"  value={"₦"+Number(stats.revenue||0).toLocaleString()} sub="from sold stock" icon="₦" color="var(--green)" />
       </div>
 
       {stats.alerts?.length > 0 && (
         <div className="alerts-section">
           <h3 className="section-title">⚠️ Active alerts</h3>
           <div className="alerts-list">
-            {stats.alerts.map((a,i)=>(
+            {stats.alerts.map((a,i) => (
               <div key={i} className={`alert-item alert-${a.severity}`}>
-                <div className="alert-dot"></div>
+                <div className="alert-dot" />
                 <div>
                   <div className="alert-prod">{a.product}</div>
-                  <div className="alert-detail">{a.type}{a.days!=null ? ` — ${a.days} days to expiry` : ''}</div>
+                  <div className="alert-detail">{a.type}{a.days != null ? ` — ${a.days} days to expiry` : ''}</div>
                 </div>
               </div>
             ))}
@@ -76,6 +95,8 @@ export default function Dashboard() {
       )}
 
       <div className="charts-row">
+
+        {/* Revenue by category */}
         <div className="chart-card">
           <h3 className="chart-title">Revenue by category</h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -88,31 +109,50 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
+        {/* Expiry risk */}
         <div className="chart-card">
           <h3 className="chart-title">Expiry risk distribution</h3>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={riskData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
-                dataKey="value" label={({name,value})=>`${name}: ${value}`} labelLine={false}>
-                {riskData.map((e,i)=><Cell key={i} fill={e.fill} />)}
+              <Pie
+                data={riskData}
+                cx="50%" cy="50%"
+                innerRadius={45} outerRadius={70}
+                dataKey="value"
+                label={false}
+                labelLine={false}
+              >
+                {riskData.map((e,i) => <Cell key={i} fill={e.fill} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(v,n) => [v, n]} />
             </PieChart>
           </ResponsiveContainer>
+          {/* legend rendered as normal HTML below the chart — never clipped */}
+          <PieLegend data={riskData} />
         </div>
 
+        {/* Sales velocity */}
         <div className="chart-card">
           <h3 className="chart-title">Sales velocity</h3>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={velData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
-                dataKey="value" label={({name,value})=>`${name}: ${value}`} labelLine={false}>
-                {velData.map((e,i)=><Cell key={i} fill={e.fill} />)}
+              <Pie
+                data={velData}
+                cx="50%" cy="50%"
+                innerRadius={45} outerRadius={70}
+                dataKey="value"
+                label={false}
+                labelLine={false}
+              >
+                {velData.map((e,i) => <Cell key={i} fill={e.fill} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(v,n) => [v, n]} />
             </PieChart>
           </ResponsiveContainer>
+          {/* legend rendered as normal HTML below the chart — never clipped */}
+          <PieLegend data={velData} />
         </div>
+
       </div>
     </div>
   )

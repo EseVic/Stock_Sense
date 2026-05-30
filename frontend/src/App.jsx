@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import Landing        from './pages/Landing'
 import Login          from './pages/Login'
 import Register       from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
@@ -26,6 +27,9 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          {/* Landing page */}
+          <Route path="/landing" element={<Landing />} />
+
           {/* Public auth pages */}
           <Route path="/login"           element={<Login />} />
           <Route path="/register"        element={<Register />} />
