@@ -6,15 +6,15 @@ import './Auth.css'
 const CITIES = ['Lagos','Abuja','Kano','Port Harcourt','Ibadan','Benin City','Kaduna','Aba','Enugu','Onitsha','Warri','Ilorin','Jos','Owerri','Uyo']
 
 export default function Register() {
-  const [form,    setForm]    = useState({ name:'', email:'', password:'', store_name:'', city:'Lagos' })
-  const [error,   setError]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [done,    setDone]    = useState(false)
-  const [showPw,  setShowPw]  = useState(false)
+  const [form,      setForm]      = useState({ name:'', email:'', password:'', store_name:'', city:'Lagos' })
+  const [error,     setError]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [done,      setDone]      = useState(false)
+  const [showPw,    setShowPw]    = useState(false)
   const [resending, setResending] = useState(false)
   const [resentMsg, setResentMsg] = useState('')
 
-  const set = k => e => setForm({...form, [k]:e.target.value})
+  const set = k => e => setForm({...form,[k]:e.target.value})
 
   const submit = async () => {
     if (!form.name||!form.email||!form.password) return setError('All fields are required')
@@ -42,6 +42,10 @@ export default function Register() {
     return (
       <div className="auth-wrap">
         <div className="auth-left">
+          <Link to="/landing" className="auth-back">
+            <span className="auth-back-arrow">←</span>
+            Back to home
+          </Link>
           <div className="auth-brand">
             <div className="auth-logo">S</div>
             <h1>StockSense</h1>
@@ -63,20 +67,15 @@ export default function Register() {
               ⚠️ You will not be able to log in until you verify your email.
             </div>
             {resentMsg && (
-              <p style={{fontSize:13,marginTop:12,textAlign:'center',color: resentMsg.startsWith('✅') ? 'var(--green)' : '#c0392b'}}>
+              <p style={{fontSize:13,marginTop:12,textAlign:'center',color:resentMsg.startsWith('✅')?'var(--green)':'#c0392b'}}>
                 {resentMsg}
               </p>
             )}
-            <button
-              onClick={resend}
-              disabled={resending}
-              style={{width:'100%',marginTop:16,padding:'11px',borderRadius:10,border:'1px solid var(--green)',background:'transparent',color:'var(--green)',cursor:'pointer',fontWeight:600,fontSize:14}}
-            >
+            <button onClick={resend} disabled={resending}
+              style={{width:'100%',marginTop:16,padding:'11px',borderRadius:10,border:'1px solid var(--green)',background:'transparent',color:'var(--green)',cursor:'pointer',fontWeight:600,fontSize:14}}>
               {resending ? 'Sending…' : 'Resend verification email'}
             </button>
-            <p className="auth-switch" style={{marginTop:16}}>
-              Already verified? <Link to="/login">Sign in</Link>
-            </p>
+            <p className="auth-switch" style={{marginTop:16}}>Already verified? <Link to="/login">Sign in</Link></p>
           </div>
         </div>
       </div>
@@ -86,6 +85,12 @@ export default function Register() {
   return (
     <div className="auth-wrap">
       <div className="auth-left">
+        {/* ── back to landing ── */}
+        <Link to="/landing" className="auth-back">
+          <span className="auth-back-arrow">←</span>
+          Back to home
+        </Link>
+
         <div className="auth-brand">
           <div className="auth-logo">S</div>
           <h1>StockSense</h1>
@@ -111,20 +116,11 @@ export default function Register() {
 
           <label className="field-label">Password</label>
           <div style={{position:'relative'}}>
-            <input
-              className="field-input"
-              type={showPw ? 'text' : 'password'}
-              value={form.password}
-              onChange={set('password')}
-              placeholder="At least 8 characters"
-              style={{paddingRight:44}}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw(v => !v)}
-              style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'#888',lineHeight:1}}
-            >
-              {showPw ? '🙈' : '👁️'}
+            <input className="field-input" type={showPw?'text':'password'} value={form.password}
+              onChange={set('password')} placeholder="At least 8 characters" style={{paddingRight:44}} />
+            <button type="button" onClick={()=>setShowPw(v=>!v)}
+              style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',fontSize:18,color:'#888',lineHeight:1}}>
+              {showPw?'🙈':'👁️'}
             </button>
           </div>
 
