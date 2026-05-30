@@ -13,9 +13,64 @@ function GaugeBar({ value, color }) {
   )
 }
 
+// ── CSV export for predictions ──
+function exportPredCSV(items) {
+  const headers = ['Product','Category','City','Qty Remaining','Expiry Risk','Sales Velocity','Customer Preference','Slow Mover','Confidence %','Recommendation']
+  const rows = items.map(i => [
+    i.product_name, i.category, i.store_city||'', i.qty_remaining||0,
+    i.expiry_risk||'', i.sales_velocity||'', i.customer_preference||'',
+    i.slow_mover||'', i.prediction_confidence||'',
+    (i.recommendation||'').replace(/\s*\|\s*/g,' | ')
+  ])
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type:'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = `stocksense_predictions_${new Date().toISOString().slice(0,10)}.csv`
+  a.click(); URL.revokeObjectURL(url)
+}
+
+// ── Print predictions ──
+function printPredictions(items) {
+  const rows = items.map(i => `
+    <tr>
+      <td>${i.product_name}</td>
+      <td>${i.expiry_risk||'—'}</td>
+      <td>${i.sales_velocity||'—'}</td>
+      <td>${i.customer_preference||'—'}</td>
+      <td>${i.slow_mover||'—'}</td>
+      <td>${i.prediction_confidence||'—'}%</td>
+      <td>${(i.recommendation||'—').replace(/\s*\|\s*/g,'<br/>')}</td>
+    </tr>`).join('')
+  const html = `
+    <html><head><title>StockSense — Predictions</title>
+    <style>
+      body { font-family:Arial,sans-serif; font-size:11px; padding:20px; }
+      h2   { margin-bottom:4px; }
+      p    { color:#666; margin-bottom:12px; font-size:11px; }
+      table { width:100%; border-collapse:collapse; }
+      th { background:#0F2419; color:#fff; padding:7px 8px; text-align:left; font-size:10px; }
+      td { padding:6px 8px; border-bottom:1px solid #eee; vertical-align:top; }
+      tr:nth-child(even) td { background:#f9f9f9; }
+    </style></head>
+    <body>
+      <h2>StockSense — Predictions Report</h2>
+      <p>Generated: ${new Date().toLocaleString()}</p>
+      <table>
+        <thead><tr>
+          <th>Product</th><th>Expiry Risk</th><th>Sales Speed</th>
+          <th>Preference</th><th>Slow Mover</th><th>Confidence</th><th>Recommendation</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`
+  const w = window.open('', '_blank')
+  w.document.write(html); w.document.close(); w.print()
+}
+
 function PredCard({ item, onPredict }) {
-  const [open,     setOpen]     = useState(false)
-  const [running,  setRunning]  = useState(false)
+  const [open,    setOpen]    = useState(false)
+  const [running, setRunning] = useState(false)
   const er   = item.expiry_risk||'—'
   const sv   = item.sales_velocity||'—'
   const cp   = item.customer_preference||'—'
@@ -26,13 +81,8 @@ function PredCard({ item, onPredict }) {
   const isGood = er==='Low'&&sv==='Fast'&&cp==='High'
 
   const handlePredict = async (e) => {
-    e.stopPropagation()
-    setRunning(true)
-    try {
-      await onPredict(item.id)
-    } finally {
-      setRunning(false)
-    }
+    e.stopPropagation(); setRunning(true)
+    try { await onPredict(item.id) } finally { setRunning(false) }
   }
 
   return (
@@ -52,16 +102,10 @@ function PredCard({ item, onPredict }) {
           <span className={`pb ${sm==='Yes'?'pb-warn':'pb-ok'}`}>Slow: {sm}</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}} onClick={e=>e.stopPropagation()}>
-          <button
-            className="pred-single-btn"
-            onClick={handlePredict}
-            disabled={running}
+          <button className="pred-single-btn" onClick={handlePredict} disabled={running}
             title="Re-run ML prediction for this item only"
-            style={{
-              fontSize:12,padding:'4px 10px',borderRadius:6,border:'1px solid var(--green)',
-              background:'transparent',color:'var(--green)',cursor:'pointer',whiteSpace:'nowrap'
-            }}
-          >
+            style={{fontSize:12,padding:'4px 10px',borderRadius:6,border:'1px solid var(--green)',
+              background:'transparent',color:'var(--green)',cursor:'pointer',whiteSpace:'nowrap'}}>
             {running ? '⟳…' : '◎ Predict'}
           </button>
           <span className="pred-chevron" onClick={()=>setOpen(!open)}>{open?'▲':'▼'}</span>
@@ -72,10 +116,10 @@ function PredCard({ item, onPredict }) {
         <div className="pred-body">
           <div className="pred-gauges">
             {[
-              { label:'Expiry risk',     val:conf,    color:RISK_COLOR[er] },
+              { label:'Expiry risk',     val:conf,                              color:RISK_COLOR[er] },
               { label:'Sales velocity',  val:sv==='Fast'?85:sv==='Moderate'?55:20, color:VEL_COLOR[sv] },
-              { label:'Customer demand', val:cp==='High'?90:cp==='Medium'?55:20, color:'#1B7A5A' },
-              { label:'Slow mover risk', val:sm==='Yes'?85:20, color:sm==='Yes'?'#C0392B':'#1B7A5A' },
+              { label:'Customer demand', val:cp==='High'?90:cp==='Medium'?55:20,   color:'#1B7A5A' },
+              { label:'Slow mover risk', val:sm==='Yes'?85:20,                  color:sm==='Yes'?'#C0392B':'#1B7A5A' },
             ].map(g=>(
               <div key={g.label} className="gauge-row">
                 <span className="gauge-label">{g.label}</span>
@@ -84,7 +128,6 @@ function PredCard({ item, onPredict }) {
               </div>
             ))}
           </div>
-
           {item.recommendation && (
             <div className="pred-recs">
               {item.recommendation.split(' | ').map((r,i)=>(
@@ -92,7 +135,6 @@ function PredCard({ item, onPredict }) {
               ))}
             </div>
           )}
-
           <div className="pred-meta">
             <span>Confidence: <strong>{conf}%</strong></span>
             <span>Days to expiry: <strong>{item.days_to_expiry!=null?item.days_to_expiry+'d':'—'}</strong></span>
@@ -122,7 +164,6 @@ export default function Predictions() {
 
   useEffect(()=>{ load() }, [])
 
-  // Predict ALL items
   const runAll = async () => {
     setRunning(true)
     try { await axios.post('/api/predict', {}); await load() }
@@ -130,25 +171,20 @@ export default function Predictions() {
     finally  { setRunning(false) }
   }
 
-  // Predict a SINGLE item and refresh its card in-place
   const predictOne = async (itemId) => {
     try {
       const res = await axios.post(`/api/predict/${itemId}`)
       const updated = res.data.results?.[0]
-      if (updated) {
-        setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i))
-      }
-    } catch(e) {
-      alert('ML service not available. Make sure it is running on port 5001.')
-    }
+      if (updated) setItems(prev => prev.map(i => i.id===updated.id ? {...i,...updated} : i))
+    } catch(e) { alert('ML service not available. Make sure it is running on port 5001.') }
   }
 
   const FILTERS = [
-    { key:'all',        label:'All products' },
-    { key:'high_risk',  label:'High / Expired' },
-    { key:'slow',       label:'Slow movers' },
-    { key:'fast',       label:'Fast movers' },
-    { key:'no_pred',    label:'Not predicted' },
+    { key:'all',       label:'All products' },
+    { key:'high_risk', label:'High / Expired' },
+    { key:'slow',      label:'Slow movers' },
+    { key:'fast',      label:'Fast movers' },
+    { key:'no_pred',   label:'Not predicted' },
   ]
 
   const filtered = items.filter(i=>{
@@ -166,9 +202,13 @@ export default function Predictions() {
           <h1 className="page-title">Predictions</h1>
           <p className="page-sub">ML-generated risk assessments and recommendations · {items.length} total items</p>
         </div>
-        <button className="pred-run-btn" onClick={runAll} disabled={running}>
-          {running ? '⟳ Running ML…' : '◎ Run all predictions'}
-        </button>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="icon-btn" onClick={() => exportPredCSV(filtered)} title="Export to CSV">⬇ CSV</button>
+          <button className="icon-btn" onClick={() => printPredictions(filtered)} title="Print / Save as PDF">🖨 Print</button>
+          <button className="pred-run-btn" onClick={runAll} disabled={running}>
+            {running ? '⟳ Running ML…' : '◎ Run all predictions'}
+          </button>
+        </div>
       </div>
 
       <div className="pred-filter-bar">
@@ -176,10 +216,10 @@ export default function Predictions() {
           <button key={f.key} className={`pf-btn${filter===f.key?' active':''}`} onClick={()=>setFilter(f.key)}>
             {f.label}
             <span className="pf-count">
-              {f.key==='all' ? items.length :
-               f.key==='high_risk' ? items.filter(i=>i.expiry_risk==='High'||i.expiry_risk==='Expired').length :
-               f.key==='slow'  ? items.filter(i=>i.slow_mover==='Yes').length :
-               f.key==='fast'  ? items.filter(i=>i.sales_velocity==='Fast').length :
+              {f.key==='all'      ? items.length :
+               f.key==='high_risk'? items.filter(i=>i.expiry_risk==='High'||i.expiry_risk==='Expired').length :
+               f.key==='slow'     ? items.filter(i=>i.slow_mover==='Yes').length :
+               f.key==='fast'     ? items.filter(i=>i.sales_velocity==='Fast').length :
                items.filter(i=>!i.expiry_risk).length}
             </span>
           </button>
@@ -189,12 +229,8 @@ export default function Predictions() {
       {loading ? <div className="loading">Loading predictions…</div> : (
         <div className="pred-list">
           {filtered.length===0 && <div style={{textAlign:'center',padding:'40px',color:'var(--gray)'}}>No records match this filter</div>}
-          {filtered.map((item, idx)=>(
-            <PredCard
-              key={item.id}
-              item={{...item, _displayIdx: idx + 1}}
-              onPredict={predictOne}
-            />
+          {filtered.map((item,idx)=>(
+            <PredCard key={item.id} item={{...item,_displayIdx:idx+1}} onPredict={predictOne} />
           ))}
         </div>
       )}
