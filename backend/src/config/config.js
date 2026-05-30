@@ -1,19 +1,14 @@
-// const dotenv = require('dotenv');
-// const path = require('path');
-// const Joi = require('joi');
-
 const dotenv = require('dotenv');
+const path = require('path');
 const Joi = require('joi');
 
-dotenv.config();
-// dotenv.config({ path: path.join(__dirname, '../../.env') });
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const envVarsSchema = Joi.object()
   .keys({
     NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
     PORT: Joi.number().default(3000),
-    // ML_URL: Joi.string().required().description('ML service URL'),
-    ML_URL: Joi.string().default('http://localhost:5001').description('ML service URL'),
+    ML_URL: Joi.string().required().description('ML service URL'),
     DB_URL: Joi.string().required().description('DB url'),
     JWT_SECRET: Joi.string().required().description('JWT secret key'),
     JWT_ACCESS_EXPIRATION_MINUTES: Joi.number().default(30).description('minutes after which access tokens expire'),
@@ -41,9 +36,7 @@ if (error) {
 module.exports = {
   env: envVars.NODE_ENV,
   port: envVars.PORT,
-  ml: {
-    url: envVars.ML_URL,        
-  },
+  ML_URL: envVars.ML_URL,  
   sequelize: {
     url: envVars.DB_URL + (envVars.NODE_ENV === 'test' ? '-test' : ''),
     host: envVars.DB_HOST,
