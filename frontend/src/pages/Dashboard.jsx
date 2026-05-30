@@ -20,7 +20,6 @@ function StatCard({ label, value, sub, color='var(--green)', icon }) {
   )
 }
 
-// renders a clean legend below the pie — pure HTML, never clipped
 function PieLegend({ data }) {
   return (
     <div className="pie-legend">
@@ -53,7 +52,7 @@ export default function Dashboard() {
       <div className="empty-icon">📦</div>
       <h2>No inventory data yet</h2>
       <p>Add your first stock records to see predictions and analytics here.</p>
-      <Link to="/add-stock" className="cta-btn">Add stock now</Link>
+      <Link to="/app/add-stock" className="cta-btn">Add stock now</Link>
     </div>
   )
 
@@ -67,7 +66,7 @@ export default function Dashboard() {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-sub">Overview of your inventory health</p>
         </div>
-        <Link to="/add-stock" className="cta-btn">+ Add stock</Link>
+        <Link to="/app/add-stock" className="cta-btn">+ Add stock</Link>
       </div>
 
       <div className="stat-grid">
@@ -97,7 +96,6 @@ export default function Dashboard() {
 
       <div className="charts-row">
 
-        {/* Revenue by category */}
         <div className="chart-card">
           <h3 className="chart-title">Revenue by category</h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -110,47 +108,29 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Expiry risk */}
         <div className="chart-card">
           <h3 className="chart-title">Expiry risk distribution</h3>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie
-                data={riskData}
-                cx="50%" cy="50%"
-                innerRadius={45} outerRadius={70}
-                dataKey="value"
-                label={false}
-                labelLine={false}
-              >
+              <Pie data={riskData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" label={false} labelLine={false}>
                 {riskData.map((e,i) => <Cell key={i} fill={e.fill} />)}
               </Pie>
               <Tooltip formatter={(v,n) => [v, n]} />
             </PieChart>
           </ResponsiveContainer>
-          {/* legend rendered as normal HTML below the chart — never clipped */}
           <PieLegend data={riskData} />
         </div>
 
-        {/* Sales velocity */}
         <div className="chart-card">
           <h3 className="chart-title">Sales velocity</h3>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie
-                data={velData}
-                cx="50%" cy="50%"
-                innerRadius={45} outerRadius={70}
-                dataKey="value"
-                label={false}
-                labelLine={false}
-              >
+              <Pie data={velData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" label={false} labelLine={false}>
                 {velData.map((e,i) => <Cell key={i} fill={e.fill} />)}
               </Pie>
               <Tooltip formatter={(v,n) => [v, n]} />
             </PieChart>
           </ResponsiveContainer>
-          {/* legend rendered as normal HTML below the chart — never clipped */}
           <PieLegend data={velData} />
         </div>
 
