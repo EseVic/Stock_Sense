@@ -163,4 +163,4 @@ if __name__ == "__main__":
         print("No models found — training now...")
         train_all_models()
         load_models()
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    app.run(host="0.0.0.0", port=7860, debug=False)
