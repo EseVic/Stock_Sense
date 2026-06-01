@@ -111,3 +111,14 @@
 .empty-metrics h2 { font-family: var(--font-hd); font-size: 20px; }
 .empty-metrics p  { font-size: 13px; color: var(--text-2); max-width: 380px; }
 .empty-metrics code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* ════ DARK MODE ════ */
+html.app-dark .metrics-card,
+html.app-dark .metrics-table-wrap { background:#161b22 !important; }
+html.app-dark .metrics-table th   { background:#21262d !important; color:#8b949e !important; border-bottom-color:#30363d !important; }
+html.app-dark .metrics-table td   { color:#e6edf3 !important; border-bottom-color:#30363d !important; }
+html.app-dark .metrics-table tr:hover td { background:rgba(255,255,255,.03) !important; }
+html.app-dark .metrics-label { color:#8b949e; }
+html.app-dark .metrics-val   { color:#e6edf3; }
+html.app-dark .page-title { color:#e6edf3; }
+html.app-dark .page-sub   { color:#8b949e; }

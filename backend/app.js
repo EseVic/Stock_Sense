@@ -17,9 +17,7 @@ app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "20mb" }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/api",                authRoutes);        // /api/login, /api/register, /api/me
-                                                   // /api/forgot-password, /api/reset-password
-                                                   // /api/verify-email, /api/resend-verification
+app.use("/api",                authRoutes);       
 app.use("/api/inventory",      inventoryRoutes);
 app.use("/api",                predictRoutes);
 app.use("/api",                statsRoutes);
