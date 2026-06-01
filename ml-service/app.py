@@ -157,8 +157,9 @@ def metrics():
             return jsonify(json.load(f))
     return jsonify({"error": "Models not trained yet"}), 404
 
-if __name__ == "__main__":
-    load_models()
+load_models()
+
+if __name__ == "__main__":  
     if not MODELS:
         print("No models found — training now...")
         train_all_models()
