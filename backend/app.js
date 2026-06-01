@@ -28,7 +28,7 @@ app.use("/api/sales-history",  salesHistoryRoutes);
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
-  const { useDB } = require("./db");
+  const { useDB } = require("./src/db");
   res.json({ status: "ok", db: useDB ? "postgres" : "memory", port: process.env.PORT || 3001 });
 });
 
