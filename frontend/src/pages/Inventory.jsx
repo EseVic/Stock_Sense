@@ -99,12 +99,25 @@ export default function Inventory() {
 
   useEffect(() => { load() }, [page, search, risk])
 
+  // const runPredictions = async () => {
+  //   setPred(true)
+  //   try { await axios.post('/api/predict', {}); await load() }
+  //   catch(e) { alert('ML service not running. Start it first.') }
+  //   finally  { setPred(false) }
+  // }
+
   const runPredictions = async () => {
-    setPred(true)
-    try { await axios.post('/api/predict', {}); await load() }
-    catch(e) { alert('ML service not running. Start it first.') }
-    finally  { setPred(false) }
+  setPred(true);
+  try {
+    const ids = items.map(i => i.id); // only current page
+    await axios.post('/api/predict', { ids });
+    await load();
+  } catch (e) {
+    alert('Prediction failed: ' + e.message);
+  } finally {
+    setPred(false);
   }
+}
 
   const deleteItem = async id => {
     if (!confirm('Delete this record?')) return
