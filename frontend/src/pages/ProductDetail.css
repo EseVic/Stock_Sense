@@ -1,0 +1,125 @@
+.pd-page {}
+
+.pd-back {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:13px; font-weight:500; color:var(--text-2);
+  background:none; border:none; cursor:pointer;
+  margin-bottom:16px; padding:0; transition:color .15s;
+}
+.pd-back:hover { color:var(--green); }
+
+.pd-header {
+  display:flex; align-items:flex-start;
+  justify-content:space-between; flex-wrap:wrap;
+  gap:12px; margin-bottom:20px;
+}
+.pd-badges-row { display:flex; gap:8px; flex-wrap:wrap; }
+.pd-badge {
+  display:inline-block; padding:4px 12px;
+  border-radius:99px; font-size:12px; font-weight:600;
+}
+
+/* stat cards */
+.pd-stats {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+  gap:14px; margin-bottom:20px;
+}
+.pd-stat-card {
+  background:#fff; border-radius:var(--radius-lg);
+  padding:16px 18px; box-shadow:var(--shadow);
+}
+.pd-stat-val   { font-family:var(--font-hd); font-size:22px; font-weight:700; color:var(--text); }
+.pd-stat-label { font-size:12px; color:var(--text-2); margin-top:3px; }
+
+/* restock suggestion */
+.restock-box {
+  display:flex; align-items:center; gap:14px;
+  border-radius:var(--radius-lg); padding:16px 20px;
+  margin-bottom:20px; flex-wrap:wrap;
+}
+.restock-urgent { background:#fdecea; border:1.5px solid #f5c6c2; }
+.restock-soon   { background:#fff8e1; border:1.5px solid #f9e49a; }
+.restock-ok     { background:#e6f5ef; border:1.5px solid #a8dfc9; }
+.restock-icon   { font-size:28px; flex-shrink:0; }
+.restock-body   { flex:1; min-width:0; }
+.restock-title  { font-size:13px; font-weight:700; margin-bottom:4px; }
+.restock-urgent .restock-title { color:var(--red); }
+.restock-soon   .restock-title { color:#7A4F00; }
+.restock-ok     .restock-title { color:var(--green-dk); }
+.restock-detail { font-size:13px; line-height:1.6; color:var(--text-2); }
+.restock-detail strong { color:var(--text); }
+.restock-btn {
+  padding:8px 16px; border-radius:9px;
+  background:var(--green); color:#fff;
+  font-size:13px; font-weight:600;
+  text-decoration:none; flex-shrink:0;
+  transition:background .15s;
+}
+.restock-btn:hover { background:var(--green-dk); }
+
+/* chart card */
+.pd-chart-card {
+  background:#fff; border-radius:var(--radius-lg);
+  padding:18px; box-shadow:var(--shadow);
+  margin-bottom:20px;
+}
+.pd-section-title { font-size:14px; font-weight:600; margin-bottom:14px; }
+
+/* table card */
+.pd-table-card {
+  background:#fff; border-radius:var(--radius-lg);
+  padding:18px; box-shadow:var(--shadow);
+}
+.pd-table-wrap { overflow-x:auto; }
+.pd-table {
+  width:100%; border-collapse:collapse;
+  font-size:12.5px; white-space:nowrap;
+}
+.pd-table th {
+  background:var(--gray-lt); padding:9px 12px;
+  text-align:left; font-size:11px; font-weight:600;
+  color:var(--text-2); border-bottom:1px solid var(--border);
+}
+.pd-table td {
+  padding:10px 12px;
+  border-bottom:1px solid var(--border);
+  color:var(--text);
+}
+.pd-table tr:last-child td { border-bottom:none; }
+.pd-table tr:hover td { background:var(--gray-lt); }
+.td-urgent { color:var(--red); font-weight:600; }
+.pd-rec-cell { max-width:220px; white-space:normal; font-size:11px; color:var(--text-2); line-height:1.4; }
+
+.pd-back-btn {
+  display:inline-block; margin-top:16px;
+  padding:9px 18px; border-radius:9px;
+  background:var(--green); color:#fff;
+  font-size:13px; font-weight:600;
+  text-decoration:none;
+}
+.pd-empty {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  height:60vh; text-align:center; gap:12px;
+}
+.pd-empty h2 { font-family:var(--font-hd); font-size:22px; }
+
+/* dark mode */
+html.app-dark .pd-stat-card,
+html.app-dark .pd-chart-card,
+html.app-dark .pd-table-card { background:#161b22; }
+html.app-dark .pd-stat-val   { color:#e6edf3; }
+html.app-dark .pd-stat-label { color:#8b949e; }
+html.app-dark .pd-section-title { color:#e6edf3; }
+html.app-dark .pd-table th { background:#21262d; color:#8b949e; border-bottom-color:#30363d; }
+html.app-dark .pd-table td { color:#e6edf3; border-bottom-color:#30363d; }
+html.app-dark .pd-table tr:hover td { background:rgba(255,255,255,.03); }
+html.app-dark .pd-rec-cell  { color:#8b949e; }
+html.app-dark .restock-detail { color:#8b949e; }
+html.app-dark .restock-detail strong { color:#e6edf3; }
+
+@media(max-width:600px) {
+  .pd-stats { grid-template-columns:1fr 1fr; }
+  .pd-header { flex-direction:column; }
+}

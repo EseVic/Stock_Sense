@@ -15,6 +15,8 @@ import Suppliers      from './pages/Suppliers'
 import PurchaseOrders from './pages/PurchaseOrders'
 import SalesHistory   from './pages/SalesHistory'
 import Layout         from './components/Layout'
+import Notifications from './pages/Notifications'
+import ProductDetail from './pages/ProductDetail'
 
 function Protected({ children }) {
   const { user, loading } = useAuth()
@@ -41,6 +43,8 @@ export default function App() {
           <Route path="/app" element={<Protected><Layout /></Protected>}>
             <Route index                    element={<Dashboard />} />
             <Route path="inventory"         element={<Inventory />} />
+            <Route path="inventory/:name" element={<ProductDetail />} />
+            <Route path="notifications"   element={<Notifications />} />
             <Route path="add-stock"         element={<AddStock />} />
             <Route path="predictions"       element={<Predictions />} />
             <Route path="metrics"           element={<ModelMetrics />} />

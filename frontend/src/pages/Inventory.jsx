@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import './Inventory.css'
+import { Link } from 'react-router-dom'
 
 const RISK_BADGE  = { Low:'badge-green', Medium:'badge-amber', High:'badge-red', Expired:'badge-dark', '':'badge-gray' }
 const VEL_BADGE   = { Fast:'badge-green', Moderate:'badge-amber', Slow:'badge-red', '':'badge-gray' }
@@ -185,8 +186,10 @@ export default function Inventory() {
                 {items.map((item, idx) => (
                   <tr key={item.id} className={item.qty_remaining <= 5 ? 'tr-low' : ''}>
                     <td style={{color:'var(--gray)',fontSize:12,minWidth:32}}>{(page-1)*LIMIT + idx + 1}</td>
-                    <td className="td-name">
-                      {item.product_name}
+                    {/* <td className="td-name">
+                      {item.product_name} */}
+                      <td className="td-name" style={{display:'flex',alignItems:'center',gap:6}}>
+                        <Link to={`/app/inventory/${encodeURIComponent(item.product_name)}`} className="prod-link" title="View product detail">{item.product_name}</Link>
                       {item.qty_remaining <= 5 && <span className="low-badge">Low</span>}
                     </td>
                     <td className="td-cat">{item.category}</td>

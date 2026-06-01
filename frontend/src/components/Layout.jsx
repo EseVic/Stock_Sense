@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import axios from 'axios'
 import './Layout.css'
 
 const NAV = [
@@ -12,6 +13,7 @@ const NAV = [
   { to:'/app/suppliers',       icon:'🏭', label:'Suppliers'        },
   { to:'/app/purchase-orders', icon:'🛒', label:'Purchase Orders'  },
   { to:'/app/sales-history',   icon:'📈', label:'Sales History'    },
+  { to:'/app/notifications',   icon:'🔔', label:'Notifications', badge:true },
 ]
 
 function getInitialDark() {
@@ -20,27 +22,72 @@ function getInitialDark() {
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const [dark,        setDark]        = useState(getInitialDark)
-  const [drawerOpen,  setDrawerOpen]  = useState(false)
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const [dark,        setDark]       = useState(getInitialDark)
+  const [drawerOpen,  setDrawerOpen] = useState(false)
+  const [alertCount,  setAlertCount] = useState(0)
 
+  // sync dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('app-dark', dark)
     try { localStorage.setItem('ss_dark', dark) } catch {}
   }, [dark])
 
+  // fetch alert count for badge — runs once on mount then every 5 minutes
+  useEffect(() => {
+    const fetchAlerts = () => {
+      axios.get('/api/stats').then(r => {
+        const d = r.data
+        const expiry  = (d.alerts  || []).length
+        const lowStock= (d.lowStock|| []).length
+        setAlertCount(expiry + lowStock)
+      }).catch(() => {})
+    }
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // clear badge when user visits notifications page
+  useEffect(() => {
+    if (location.pathname === '/app/notifications') setAlertCount(0)
+  }, [location.pathname])
+
+  // close drawer on route change
   useEffect(() => { setDrawerOpen(false) }, [location.pathname])
 
+  // close drawer on outside click
   useEffect(() => {
     if (!drawerOpen) return
-    const close = e => { if (!e.target.closest('.mobile-drawer') && !e.target.closest('.mob-menu-btn')) setDrawerOpen(false) }
+    const close = e => {
+      if (!e.target.closest('.mobile-drawer') && !e.target.closest('.mob-menu-btn'))
+        setDrawerOpen(false)
+    }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [drawerOpen])
 
   const handle_logout = () => { logout(); navigate('/login') }
-  const currentPage = NAV.find(n => n.to === location.pathname)?.label || 'StockSense'
+
+  const currentPage = NAV.find(n =>
+    location.pathname === n.to ||
+    (n.to !== '/app' && location.pathname.startsWith(n.to))
+  )?.label || 'StockSense'
+
+  const renderNavItem = (n) => (
+    <NavLink
+      key={n.to} to={n.to}
+      end={n.to === '/app'}
+      className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+    >
+      <span className="nav-icon">{n.icon}</span>
+      <span>{n.label}</span>
+      {n.badge && alertCount > 0 && (
+        <span className="nav-badge">{alertCount > 99 ? '99+' : alertCount}</span>
+      )}
+    </NavLink>
+  )
 
   return (
     <div className="shell">
@@ -56,12 +103,7 @@ export default function Layout() {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.to==='/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
-              <span className="nav-icon">{n.icon}</span>
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
+          {NAV.map(renderNavItem)}
         </nav>
 
         <div className="sidebar-footer">
@@ -70,10 +112,10 @@ export default function Layout() {
             <span>{dark ? 'Light mode' : 'Dark mode'}</span>
           </button>
           <div className="user-info">
-            <div className="user-avatar">{user?.name?.[0]?.toUpperCase()||'U'}</div>
+            <div className="user-avatar">{user?.name?.[0]?.toUpperCase() || 'U'}</div>
             <div>
               <div className="user-name">{user?.name}</div>
-              <div className="user-store">{user?.store_name||'My Store'}</div>
+              <div className="user-store">{user?.store_name || 'My Store'}</div>
             </div>
           </div>
           <button className="logout-btn" onClick={handle_logout}>Sign out</button>
@@ -95,16 +137,25 @@ export default function Layout() {
           <span>{currentPage}</span>
         </div>
 
-        <button className="mob-dark-btn" onClick={() => setDark(d => !d)} aria-label="Toggle dark mode">
-          {dark ? '☀️' : '🌙'}
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {/* notification bell with badge for mobile topbar */}
+          <NavLink to="/app/notifications" style={{ position:'relative', display:'flex' }}>
+            <span style={{ fontSize:20 }}>🔔</span>
+            {alertCount > 0 && (
+              <span className="mob-notif-badge">{alertCount > 99 ? '99+' : alertCount}</span>
+            )}
+          </NavLink>
+          <button className="mob-dark-btn" onClick={() => setDark(d => !d)} aria-label="Toggle dark mode">
+            {dark ? '☀️' : '🌙'}
+          </button>
+        </div>
       </header>
 
       {/* ── MOBILE DRAWER ── */}
       {drawerOpen && <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />}
       <div className={`mobile-drawer${drawerOpen ? ' mobile-drawer--open' : ''}`}>
         <div className="drawer-header">
-          <div className="sidebar-logo" style={{padding:'20px 16px',borderBottom:'none'}}>
+          <div className="sidebar-logo" style={{ padding:'20px 16px', borderBottom:'none' }}>
             <div className="logo-icon">S</div>
             <div>
               <div className="logo-name">StockSense</div>
@@ -114,12 +165,7 @@ export default function Layout() {
         </div>
 
         <nav className="drawer-nav">
-          {NAV.map(n => (
-            <NavLink key={n.to} to={n.to} end={n.to==='/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
-              <span className="nav-icon">{n.icon}</span>
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
+          {NAV.map(renderNavItem)}
         </nav>
 
         <div className="drawer-footer">
@@ -127,14 +173,14 @@ export default function Layout() {
             <span>{dark ? '☀️' : '🌙'}</span>
             <span>{dark ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <div className="user-info" style={{marginTop:8}}>
-            <div className="user-avatar">{user?.name?.[0]?.toUpperCase()||'U'}</div>
+          <div className="user-info" style={{ marginTop:8 }}>
+            <div className="user-avatar">{user?.name?.[0]?.toUpperCase() || 'U'}</div>
             <div>
               <div className="user-name">{user?.name}</div>
-              <div className="user-store">{user?.store_name||'My Store'}</div>
+              <div className="user-store">{user?.store_name || 'My Store'}</div>
             </div>
           </div>
-          <button className="logout-btn" onClick={handle_logout} style={{marginTop:10}}>Sign out</button>
+          <button className="logout-btn" onClick={handle_logout} style={{ marginTop:10 }}>Sign out</button>
         </div>
       </div>
 

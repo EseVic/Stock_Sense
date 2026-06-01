@@ -1,6 +1,6 @@
 .add-stock { max-width:960px; }
 .as-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; }
-.as-tab { padding:9px 20px; font-size:13px; color:var(--text-2); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.15s; }
+.as-tab { padding:9px 20px; font-size:13px; color:var(--text-2); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none; cursor:pointer; }
 .as-tab.active { color:var(--green); border-bottom-color:var(--green); font-weight:600; }
 
 .as-form-wrap { display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start; }
@@ -10,14 +10,46 @@
 .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .fg-2 { grid-column:span 2; }
 .field-label { display:block; font-size:12px; font-weight:500; color:var(--text-2); margin-bottom:4px; }
-.field-input { width:100%; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; background:#fff; color:var(--text); outline:none; transition:border 0.15s; }
-.field-input:focus { border-color:var(--green); }
+
+/* ── field input — date inputs must show their calendar picker ── */
+.field-input {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  transition: border 0.15s;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field-input:focus { border-color: var(--green); }
+
+/* make sure date inputs show their native calendar icon */
+input[type="date"].field-input,
+input[type="date"] {
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+  color-scheme: light;
+}
+
+/* date picker in dark mode */
+html.app-dark input[type="date"].field-input,
+html.app-dark input[type="date"] {
+  color-scheme: dark;
+  background: #0d1117 !important;
+  color: #e6edf3 !important;
+  border-color: #30363d !important;
+}
 
 .as-error { background:var(--red-lt); color:var(--red); padding:10px 12px; border-radius:8px; font-size:13px; margin-top:12px; }
 .as-actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
-.as-add-btn { padding:9px 18px; border-radius:9px; border:1.5px solid var(--green); color:var(--green); font-size:13px; font-weight:600; background:#fff; transition:all 0.15s; }
+.as-add-btn { padding:9px 18px; border-radius:9px; border:1.5px solid var(--green); color:var(--green); font-size:13px; font-weight:600; background:#fff; transition:all 0.15s; cursor:pointer; }
 .as-add-btn:hover { background:var(--green-lt); }
-.as-submit-btn { padding:9px 20px; border-radius:9px; background:var(--green); color:#fff; font-size:13px; font-weight:600; transition:background 0.15s; }
+.as-submit-btn { padding:9px 20px; border-radius:9px; background:var(--green); color:#fff; font-size:13px; font-weight:600; transition:background 0.15s; cursor:pointer; border:none; }
 .as-submit-btn:hover:not(:disabled) { background:var(--green-dk); }
 .as-submit-btn:disabled { opacity:0.6; }
 
@@ -26,7 +58,7 @@
 .queue-item { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--gray-lt); border-radius:8px; }
 .qi-name { font-size:13px; font-weight:500; }
 .qi-detail { font-size:11px; color:var(--text-2); margin-top:1px; }
-.qi-remove { color:var(--text-2); font-size:14px; padding:4px; border-radius:4px; }
+.qi-remove { color:var(--text-2); font-size:14px; padding:4px; border-radius:4px; background:none; border:none; cursor:pointer; }
 .qi-remove:hover { background:var(--border); }
 
 .csv-wrap { max-width:600px; }
@@ -48,3 +80,24 @@
 .as-result h3 { font-size:14px; font-weight:600; color:var(--green-dk); margin-bottom:4px; }
 .as-result p  { font-size:13px; color:var(--text-2); }
 .as-result a  { color:var(--green); font-weight:500; }
+
+/* ── dark mode ── */
+html.app-dark .as-form,
+html.app-dark .as-queue,
+html.app-dark .csv-box,
+html.app-dark .csv-preview { background:#161b22 !important; border-color:#30363d; }
+html.app-dark .field-label { color:#8b949e; }
+html.app-dark .field-input { background:#0d1117 !important; border-color:#30363d !important; color:#e6edf3 !important; }
+html.app-dark .field-input:focus { border-color:#4dd4a0 !important; }
+html.app-dark .form-section-title { color:#8b949e; }
+html.app-dark .queue-item { background:#21262d; }
+html.app-dark .qi-name  { color:#e6edf3; }
+html.app-dark .qi-detail { color:#8b949e; }
+html.app-dark .as-add-btn { background:#161b22; color:#4dd4a0; border-color:#4dd4a0; }
+html.app-dark .preview-table th { background:#21262d; color:#8b949e; }
+html.app-dark .preview-table td { color:#e6edf3; border-bottom-color:#30363d; }
+html.app-dark .csv-title { color:#e6edf3; }
+html.app-dark .csv-sub   { color:#8b949e; }
+html.app-dark .as-tabs   { border-bottom-color:#30363d; }
+html.app-dark .as-tab    { color:#8b949e; }
+html.app-dark .as-tab.active { color:#4dd4a0; border-bottom-color:#4dd4a0; }
