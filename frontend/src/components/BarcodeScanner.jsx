@@ -178,30 +178,29 @@ export default function BarcodeScanner({ onScan, onClose }) {
   useEffect(() => {
     if (mode !== "camera") return;
 
+    let stream = null;
     const codeReader = new BrowserMultiFormatReader();
     readerRef.current = codeReader;
 
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
+      .getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      })
+      .then((s) => {
+        stream = s;
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
 
-        const scanInterval = setInterval(async () => {
-          try {
-            const result = await codeReader.decodeOnce(videoRef.current);
-            if (result) {
-              clearInterval(scanInterval);
-              stream.getTracks().forEach((t) => t.stop());
-              onScan(result.getText());
-            }
-          } catch (e) {
-            // keep scanning
+        codeReader.decodeFromStream(stream, videoRef.current, (result, err) => {
+          if (result) {
+            codeReader.reset();
+            stream.getTracks().forEach((t) => t.stop());
+            onScan(result.getText());
           }
-        }, 500);
-
-        readerRef.current.interval = scanInterval;
-        readerRef.current.stream = stream;
+        });
       })
       .catch((err) => {
         setError(err.message);
@@ -209,10 +208,10 @@ export default function BarcodeScanner({ onScan, onClose }) {
       });
 
     return () => {
-      if (readerRef.current?.interval)
-        clearInterval(readerRef.current.interval);
-      if (readerRef.current?.stream)
-        readerRef.current.stream.getTracks().forEach((t) => t.stop());
+      try {
+        codeReader.reset();
+      } catch (e) {}
+      if (stream) stream.getTracks().forEach((t) => t.stop());
     };
   }, [mode]);
 
