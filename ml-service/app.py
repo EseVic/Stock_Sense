@@ -88,8 +88,8 @@ def predict():
                 # x_raw    = task_df[feat_cols].fillna(0).values
                 # x_scaled = scaler.transform(x_raw) if scaler else x_raw
                 x_frame  = task_df[feat_cols].fillna(0)
-x_raw    = x_frame.values
-x_scaled = scaler.transform(x_frame) if scaler else x_raw
+                x_raw    = x_frame.values
+                x_scaled = scaler.transform(x_frame) if scaler else x_raw
 
                 dt_pred = lr_pred = dt_conf = lr_conf = None
 
