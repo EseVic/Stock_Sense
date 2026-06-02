@@ -73,7 +73,7 @@ TARGET_COLS = ["expiry_risk", "sales_velocity", "customer_preference", "slow_mov
 
 def load_data():
     paths = [
-        "data/Stocksense-Inventory.csv",
+        "data/StockSense-Inventory.csv",
     ]
     for p in paths:
         if os.path.exists(p):
