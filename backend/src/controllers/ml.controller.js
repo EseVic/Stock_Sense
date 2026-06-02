@@ -1,22 +1,68 @@
-const axios      = require("axios");
+// const axios      = require("axios");
+// const { ML_URL } = require("../config");
+
+// const MLController = {
+//   async train(req, res) {
+//     try {
+//       const r = await axios.post(`${ML_URL}/train`, {}, { timeout: 120000 });
+//       res.json(r.data);
+//     } catch (e) {
+//       res.status(500).json({ error: "ML service error: " + e.message });
+//     }
+//   },
+
+//   async metrics(req, res) {
+//     try {
+//       const r = await axios.get(`${ML_URL}/metrics`, { timeout: 30000 });
+//       res.json(r.data);
+//     } catch (e) {
+//       res.status(500).json({ error: "ML service not available" });
+//     }
+//   },
+// };
+
+// module.exports = MLController;
+
+
+const axios = require("axios");
 const { ML_URL } = require("../config");
 
 const MLController = {
   async train(req, res) {
     try {
-      const r = await axios.post(`${ML_URL}/train`, {}, { timeout: 120000 });
+      const r = await axios.post(`${ML_URL}/train`, {}, { timeout: 180000 });
       res.json(r.data);
     } catch (e) {
-      res.status(500).json({ error: "ML service error: " + e.message });
+      console.error("ML train error:", {
+        mlUrl: ML_URL,
+        message: e.message,
+        code: e.code,
+        response: e.response?.data,
+      });
+
+      res.status(500).json({
+        error: "ML service training failed",
+        details: e.response?.data || e.message,
+      });
     }
   },
 
   async metrics(req, res) {
     try {
-      const r = await axios.get(`${ML_URL}/metrics`, { timeout: 5000 });
+      const r = await axios.get(`${ML_URL}/metrics`, { timeout: 60000 });
       res.json(r.data);
     } catch (e) {
-      res.status(500).json({ error: "ML service not available" });
+      console.error("ML metrics error:", {
+        mlUrl: ML_URL,
+        message: e.message,
+        code: e.code,
+        response: e.response?.data,
+      });
+
+      res.status(500).json({
+        error: "ML service not available",
+        details: e.response?.data || e.message,
+      });
     }
   },
 };
