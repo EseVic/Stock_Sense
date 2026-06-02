@@ -1,449 +1,494 @@
-// import { useEffect, useRef, useState } from 'react'
+// import { useEffect, useRef, useState } from "react";
+// import { BrowserMultiFormatReader } from "@zxing/browser";
 
-// /**
-//  * BarcodeScanner component
-//  * - Uses camera if available (works great on mobile)
-//  * - Falls back to manual entry on desktop without webcam
-//  * Props:
-//  *   onScan(result)  — called with the scanned/entered barcode string
-//  *   onClose()       — called when user closes the scanner
-//  */
 // export default function BarcodeScanner({ onScan, onClose }) {
-//   const [mode,       setMode]       = useState('detecting') // detecting | camera | manual | nocamera
-//   const [manualCode, setManualCode] = useState('')
-//   const [error,      setError]      = useState('')
-//   const scannerRef  = useRef(null)
-//   const containerRef = useRef(null)
+//   const [mode, setMode] = useState("camera");
+//   const [manualCode, setManualCode] = useState("");
+//   const [error, setError] = useState("");
+//   const videoRef = useRef(null);
+//   const readerRef = useRef(null);
 
 //   useEffect(() => {
-//     // Check if camera is available
-//     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-//       setMode('nocamera')
-//       return
-//     }
+//     if (mode !== "camera") return;
 
-//     // Try to start camera
-//     let html5QrCode = null
-//     import('html5-qrcode').then(({ Html5Qrcode }) => {
-//       if (!containerRef.current) return
-//       html5QrCode = new Html5Qrcode('barcode-scanner-view')
-//       scannerRef.current = html5QrCode
+//     let stream = null;
+//     const codeReader = new BrowserMultiFormatReader();
+//     readerRef.current = codeReader;
 
-//       html5QrCode.start(
-//         { facingMode: 'environment' },
-//         { fps: 10, qrbox: { width: 250, height: 150 } },
-//         (decodedText) => {
-//           html5QrCode.stop().catch(() => {})
-//           onScan(decodedText)
+//     navigator.mediaDevices
+//       .getUserMedia({
+//         video: {
+//           facingMode: "environment",
+//           width: { ideal: 1280 },
+//           height: { ideal: 720 },
 //         },
-//         () => {}
-//       )
-//       .then(() => setMode('camera'))
-//       .catch(() => {
-//         // No camera or permission denied
-//         setMode('nocamera')
 //       })
-//     }).catch(() => setMode('nocamera'))
+//       .then((s) => {
+//         stream = s;
+//         videoRef.current.srcObject = stream;
+
+//         codeReader.decodeFromStream(stream, videoRef.current, (result, err) => {
+//           if (result) {
+//             codeReader.reset();
+//             stream.getTracks().forEach((t) => t.stop());
+//             onScan(result.getText());
+//           }
+//         });
+//       })
+//       .catch((err) => {
+//         setError(err.message);
+//         setMode("manual");
+//       });
 
 //     return () => {
-//       if (scannerRef.current) {
-//         scannerRef.current.stop().catch(() => {})
-//       }
-//     }
-//   }, [])
+//       try {
+//         codeReader.reset();
+//       } catch (e) {}
+//       if (stream) stream.getTracks().forEach((t) => t.stop());
+//     };
+//   }, [mode]);
 
 //   const submitManual = () => {
-//     if (!manualCode.trim()) return setError('Please enter a barcode or product name')
-//     onScan(manualCode.trim())
-//   }
+//     if (!manualCode.trim())
+//       return setError("Please enter a barcode or product name");
+//     onScan(manualCode.trim());
+//   };
 
 //   return (
-//     <div style={{
-//       position:'fixed', inset:0, background:'rgba(0,0,0,0.75)',
-//       display:'flex', alignItems:'center', justifyContent:'center',
-//       zIndex:9999, padding:16
-//     }}>
-//       <div style={{
-//         background:'#fff', borderRadius:16, padding:24,
-//         width:'100%', maxWidth:440,
-//       }}>
-//         {/* Header */}
-//         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-//           <h3 style={{margin:0,fontSize:17,fontWeight:700}}>
-//             {mode === 'camera' ? '📷 Scan Barcode / QR Code' : '🔢 Enter Barcode'}
+//     <div
+//       style={{
+//         position: "fixed",
+//         inset: 0,
+//         background: "rgba(0,0,0,0.75)",
+//         display: "flex",
+//         alignItems: "center",
+//         justifyContent: "center",
+//         zIndex: 9999,
+//         padding: 16,
+//       }}
+//     >
+//       <div
+//         style={{
+//           background: "#fff",
+//           borderRadius: 16,
+//           padding: 24,
+//           width: "100%",
+//           maxWidth: 440,
+//         }}
+//       >
+//         <div
+//           style={{
+//             display: "flex",
+//             justifyContent: "space-between",
+//             alignItems: "center",
+//             marginBottom: 20,
+//           }}
+//         >
+//           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+//             {mode === "camera"
+//               ? "📷 Scan Barcode / QR Code"
+//               : "🔢 Enter Barcode"}
 //           </h3>
-//           <button onClick={onClose} style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}}>✕</button>
+//           <button
+//             onClick={onClose}
+//             style={{
+//               background: "none",
+//               border: "none",
+//               fontSize: 22,
+//               cursor: "pointer",
+//               color: "#888",
+//             }}
+//           >
+//             ✕
+//           </button>
 //         </div>
 
-//         {/* Tab switcher */}
-//         <div style={{display:'flex',gap:8,marginBottom:20}}>
+//         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
 //           <button
-//             onClick={() => setMode('camera')}
-//             style={{flex:1,padding:'8px',borderRadius:8,border:'1px solid',
-//               borderColor: mode==='camera'?'var(--green)':'#ddd',
-//               background: mode==='camera'?'var(--green)':'#fff',
-//               color: mode==='camera'?'#fff':'#555',
-//               cursor:'pointer',fontSize:13,fontWeight:600}}
+//             onClick={() => setMode("camera")}
+//             style={{
+//               flex: 1,
+//               padding: "8px",
+//               borderRadius: 8,
+//               border: "1px solid",
+//               borderColor: mode === "camera" ? "var(--green)" : "#ddd",
+//               background: mode === "camera" ? "var(--green)" : "#fff",
+//               color: mode === "camera" ? "#fff" : "#555",
+//               cursor: "pointer",
+//               fontSize: 13,
+//               fontWeight: 600,
+//             }}
 //           >
 //             📷 Camera scan
 //           </button>
 //           <button
-//             onClick={() => setMode('manual')}
-//             style={{flex:1,padding:'8px',borderRadius:8,border:'1px solid',
-//               borderColor: mode==='manual'||mode==='nocamera'?'var(--green)':'#ddd',
-//               background: mode==='manual'||mode==='nocamera'?'var(--green)':'#fff',
-//               color: mode==='manual'||mode==='nocamera'?'#fff':'#555',
-//               cursor:'pointer',fontSize:13,fontWeight:600}}
+//             onClick={() => {
+//               setMode("manual");
+//               setError("");
+//             }}
+//             style={{
+//               flex: 1,
+//               padding: "8px",
+//               borderRadius: 8,
+//               border: "1px solid",
+//               borderColor: mode === "manual" ? "var(--green)" : "#ddd",
+//               background: mode === "manual" ? "var(--green)" : "#fff",
+//               color: mode === "manual" ? "#fff" : "#555",
+//               cursor: "pointer",
+//               fontSize: 13,
+//               fontWeight: 600,
+//             }}
 //           >
 //             ⌨️ Type manually
 //           </button>
 //         </div>
 
-//         {/* Camera view */}
-//         {mode === 'camera' && (
+//         {mode === "camera" && (
 //           <div>
-//             <p style={{fontSize:13,color:'#888',marginBottom:10,textAlign:'center'}}>
+//             <p
+//               style={{
+//                 fontSize: 13,
+//                 color: "#888",
+//                 marginBottom: 10,
+//                 textAlign: "center",
+//               }}
+//             >
 //               Point your camera at the barcode or QR code
 //             </p>
-//             <div
-//               ref={containerRef}
-//               id="barcode-scanner-view"
-//               style={{width:'100%',borderRadius:10,overflow:'hidden',minHeight:220,background:'#111'}}
+//             <video
+//               ref={videoRef}
+//               style={{
+//                 width: "100%",
+//                 borderRadius: 10,
+//                 minHeight: 220,
+//                 background: "#111",
+//                 objectFit: "cover",
+//               }}
+//               autoPlay
+//               playsInline
+//               muted
 //             />
-//             <p style={{fontSize:12,color:'#aaa',marginTop:8,textAlign:'center'}}>
-//               Works best on mobile. On desktop, use the "Type manually" tab instead.
+//             {error && (
+//               <p
+//                 style={{
+//                   color: "#c0392b",
+//                   fontSize: 13,
+//                   marginTop: 8,
+//                   textAlign: "center",
+//                 }}
+//               >
+//                 {error}
+//               </p>
+//             )}
+//             <p
+//               style={{
+//                 fontSize: 12,
+//                 color: "#aaa",
+//                 marginTop: 8,
+//                 textAlign: "center",
+//               }}
+//             >
+//               Works best on mobile. On desktop, use the "Type manually" tab
+//               instead.
 //             </p>
 //           </div>
 //         )}
 
-//         {/* Detecting state */}
-//         {mode === 'detecting' && (
-//           <div style={{textAlign:'center',padding:'40px 0',color:'#888'}}>
-//             <div style={{fontSize:32,marginBottom:8}}>📷</div>
-//             <p>Starting camera…</p>
-//           </div>
-//         )}
-
-//         {/* No camera / manual fallback */}
-//         {(mode === 'nocamera' || mode === 'manual') && (
+//         {mode === "manual" && (
 //           <div>
-//             {mode === 'nocamera' && (
-//               <div style={{background:'#fff8e1',border:'1px solid #f9c84a',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#7a5800'}}>
-//                 ⚠️ No camera detected on this device. You can type the barcode or product name below instead.
+//             {error && (
+//               <div
+//                 style={{
+//                   background: "#fff8e1",
+//                   border: "1px solid #f9c84a",
+//                   borderRadius: 8,
+//                   padding: "10px 14px",
+//                   marginBottom: 16,
+//                   fontSize: 13,
+//                   color: "#7a5800",
+//                 }}
+//               >
+//                 ⚠️ {error}. Type the barcode or product name below.
 //               </div>
 //             )}
-//             <label style={{fontSize:13,fontWeight:600,color:'#333',display:'block',marginBottom:6}}>
+//             <label
+//               style={{
+//                 fontSize: 13,
+//                 fontWeight: 600,
+//                 color: "#333",
+//                 display: "block",
+//                 marginBottom: 6,
+//               }}
+//             >
 //               Barcode number or product name
 //             </label>
 //             <input
 //               autoFocus
-//               style={{width:'100%',padding:'11px 14px',borderRadius:8,border:'1px solid #ddd',fontSize:15,boxSizing:'border-box',marginBottom:8}}
+//               style={{
+//                 width: "100%",
+//                 padding: "11px 14px",
+//                 borderRadius: 8,
+//                 border: "1px solid #ddd",
+//                 fontSize: 15,
+//                 boxSizing: "border-box",
+//                 marginBottom: 8,
+//               }}
 //               placeholder="e.g. 6001067001234 or Indomie Noodles"
 //               value={manualCode}
-//               onChange={e => { setManualCode(e.target.value); setError('') }}
-//               onKeyDown={e => e.key === 'Enter' && submitManual()}
+//               onChange={(e) => {
+//                 setManualCode(e.target.value);
+//                 setError("");
+//               }}
+//               onKeyDown={(e) => e.key === "Enter" && submitManual()}
 //             />
-//             {error && <p style={{color:'#c0392b',fontSize:13,margin:'0 0 8px'}}>{error}</p>}
 //             <button
 //               onClick={submitManual}
-//               style={{width:'100%',padding:'12px',borderRadius:8,background:'var(--green)',color:'#fff',border:'none',cursor:'pointer',fontWeight:700,fontSize:14}}
+//               style={{
+//                 width: "100%",
+//                 padding: "12px",
+//                 borderRadius: 8,
+//                 background: "var(--green)",
+//                 color: "#fff",
+//                 border: "none",
+//                 cursor: "pointer",
+//                 fontWeight: 700,
+//                 fontSize: 14,
+//               }}
 //             >
 //               Use this barcode
 //             </button>
 //           </div>
 //         )}
 
-//         <button onClick={onClose} style={{
-//           width:'100%', marginTop:12, padding:'10px',
-//           border:'1px solid #eee', borderRadius:8,
-//           background:'#f5f5f5', cursor:'pointer', fontSize:13, color:'#666'
-//         }}>
+//         <button
+//           onClick={onClose}
+//           style={{
+//             width: "100%",
+//             marginTop: 12,
+//             padding: "10px",
+//             border: "1px solid #eee",
+//             borderRadius: 8,
+//             background: "#f5f5f5",
+//             cursor: "pointer",
+//             fontSize: 13,
+//             color: "#666",
+//           }}
+//         >
 //           Cancel
 //         </button>
 //       </div>
 //     </div>
-//   )
+//   );
 // }
 
-import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+
+import { useEffect, useRef, useState } from 'react'
 
 export default function BarcodeScanner({ onScan, onClose }) {
-  const [mode, setMode] = useState("camera");
-  const [manualCode, setManualCode] = useState("");
-  const [error, setError] = useState("");
-  const videoRef = useRef(null);
-  const readerRef = useRef(null);
+  const [mode,       setMode]       = useState('camera')
+  const [manualCode, setManualCode] = useState('')
+  const [error,      setError]      = useState('')
+  const [scanning,   setScanning]   = useState(false)
+  const videoRef    = useRef(null)
+  const streamRef   = useRef(null)
+  const intervalRef = useRef(null)
+  const readerRef   = useRef(null)
 
   useEffect(() => {
-    if (mode !== "camera") return;
+    if (mode !== 'camera') return
+    startCamera()
+    return () => stopAll()
+  }, [mode])
 
-    let stream = null;
-    const codeReader = new BrowserMultiFormatReader();
-    readerRef.current = codeReader;
+  const stopAll = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (readerRef.current)   { try { readerRef.current.reset() } catch(e) {} }
+    if (streamRef.current)   streamRef.current.getTracks().forEach(t => t.stop())
+    setScanning(false)
+  }
 
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+  const startCamera = async () => {
+    setError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       })
-      .then((s) => {
-        stream = s;
-        videoRef.current.srcObject = stream;
+      streamRef.current = stream
+      videoRef.current.srcObject = stream
+      await videoRef.current.play()
+      setScanning(true)
 
-        codeReader.decodeFromStream(stream, videoRef.current, (result, err) => {
+      // Try native BarcodeDetector first (Android Chrome)
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({
+          formats: ['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e']
+        })
+        intervalRef.current = setInterval(async () => {
+          try {
+            const barcodes = await detector.detect(videoRef.current)
+            if (barcodes.length > 0) {
+              stopAll()
+              onScan(barcodes[0].rawValue)
+            }
+          } catch(e) {}
+        }, 300)
+
+      } else {
+        // Fallback to @zxing/browser (iOS + other browsers)
+        const { BrowserMultiFormatReader } = await import('@zxing/browser')
+        const reader = new BrowserMultiFormatReader()
+        readerRef.current = reader
+        reader.decodeFromStream(stream, videoRef.current, (result, err) => {
           if (result) {
-            codeReader.reset();
-            stream.getTracks().forEach((t) => t.stop());
-            onScan(result.getText());
+            stopAll()
+            onScan(result.getText())
           }
-        });
-      })
-      .catch((err) => {
-        setError(err.message);
-        setMode("manual");
-      });
+        })
+      }
+    } catch(err) {
+      setError('Could not access camera: ' + err.message)
+      setMode('nocamera')
+    }
+  }
 
-    return () => {
-      try {
-        codeReader.reset();
-      } catch (e) {}
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-    };
-  }, [mode]);
+  const handleImageCapture = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser')
+      const reader = new BrowserMultiFormatReader()
+      const img = new Image()
+      img.src = URL.createObjectURL(file)
+      img.onload = async () => {
+        try {
+          const result = await reader.decodeFromImageElement(img)
+          onScan(result.getText())
+        } catch(e) {
+          setError('Could not read barcode from image. Try manual entry.')
+          setMode('manual')
+        }
+      }
+    } catch(e) {
+      setError('Barcode reading failed. Try manual entry.')
+      setMode('manual')
+    }
+  }
 
   const submitManual = () => {
-    if (!manualCode.trim())
-      return setError("Please enter a barcode or product name");
-    onScan(manualCode.trim());
-  };
+    if (!manualCode.trim()) return setError('Please enter a barcode or product name')
+    onScan(manualCode.trim())
+  }
+
+  const handleClose = () => { stopAll(); onClose() }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.75)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 16,
-          padding: 24,
-          width: "100%",
-          maxWidth: 440,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-            {mode === "camera"
-              ? "📷 Scan Barcode / QR Code"
-              : "🔢 Enter Barcode"}
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-              color: "#888",
-            }}
-          >
-            ✕
-          </button>
+    <div style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,0.75)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      zIndex:9999, padding:16
+    }}>
+      <div style={{
+        background:'#fff', borderRadius:16, padding:24,
+        width:'100%', maxWidth:440,
+      }}>
+        {/* Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <h3 style={{margin:0,fontSize:17,fontWeight:700}}>📷 Scan Barcode</h3>
+          <button onClick={handleClose}
+            style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}}>✕</button>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <button
-            onClick={() => setMode("camera")}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: 8,
-              border: "1px solid",
-              borderColor: mode === "camera" ? "var(--green)" : "#ddd",
-              background: mode === "camera" ? "var(--green)" : "#fff",
-              color: mode === "camera" ? "#fff" : "#555",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            📷 Camera scan
-          </button>
-          <button
-            onClick={() => {
-              setMode("manual");
-              setError("");
-            }}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: 8,
-              border: "1px solid",
-              borderColor: mode === "manual" ? "var(--green)" : "#ddd",
-              background: mode === "manual" ? "var(--green)" : "#fff",
-              color: mode === "manual" ? "#fff" : "#555",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            ⌨️ Type manually
-          </button>
+        {/* Tabs */}
+        <div style={{display:'flex',gap:8,marginBottom:20}}>
+          {[
+            { key:'camera',   label:'📷 Live scan' },
+            { key:'photo',    label:'🖼 Take photo' },
+            { key:'manual',   label:'⌨️ Type code' },
+          ].map(t => (
+            <button key={t.key} onClick={() => { stopAll(); setMode(t.key); setError('') }}
+              style={{flex:1,padding:'7px 4px',borderRadius:8,border:'1px solid',fontSize:12,fontWeight:600,cursor:'pointer',
+                borderColor: mode===t.key?'var(--green)':'#ddd',
+                background:  mode===t.key?'var(--green)':'#fff',
+                color:       mode===t.key?'#fff':'#555'}}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {mode === "camera" && (
+        {/* Live camera scan */}
+        {mode === 'camera' && (
           <div>
-            <p
-              style={{
-                fontSize: 13,
-                color: "#888",
-                marginBottom: 10,
-                textAlign: "center",
-              }}
-            >
-              Point your camera at the barcode or QR code
+            <p style={{fontSize:13,color:'#888',marginBottom:10,textAlign:'center'}}>
+              {scanning ? 'Hold barcode steady — scanning…' : 'Starting camera…'}
             </p>
-            <video
-              ref={videoRef}
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                minHeight: 220,
-                background: "#111",
-                objectFit: "cover",
-              }}
-              autoPlay
-              playsInline
-              muted
-            />
-            {error && (
-              <p
-                style={{
-                  color: "#c0392b",
-                  fontSize: 13,
-                  marginTop: 8,
-                  textAlign: "center",
-                }}
-              >
-                {error}
-              </p>
-            )}
-            <p
-              style={{
-                fontSize: 12,
-                color: "#aaa",
-                marginTop: 8,
-                textAlign: "center",
-              }}
-            >
-              Works best on mobile. On desktop, use the "Type manually" tab
-              instead.
+            <video ref={videoRef} autoPlay playsInline muted
+              style={{width:'100%',borderRadius:10,minHeight:220,background:'#111',objectFit:'cover'}} />
+            {error && <p style={{color:'#c0392b',fontSize:13,marginTop:8,textAlign:'center'}}>{error}</p>}
+            <p style={{fontSize:11,color:'#bbb',marginTop:8,textAlign:'center'}}>
+              If camera doesn't work, try "Take photo" or "Type code"
             </p>
           </div>
         )}
 
-        {mode === "manual" && (
+        {/* Photo capture — best for iOS */}
+        {mode === 'photo' && (
+          <div style={{textAlign:'center',padding:'10px 0'}}>
+            <p style={{fontSize:13,color:'#555',marginBottom:16}}>
+              Take a photo of the barcode — works great on iPhone
+            </p>
+            <label style={{
+              display:'inline-block', padding:'14px 24px', borderRadius:10,
+              background:'var(--green)', color:'#fff', fontWeight:700,
+              fontSize:15, cursor:'pointer'
+            }}>
+              📷 Open Camera
+              <input type="file" accept="image/*" capture="environment"
+                onChange={handleImageCapture} style={{display:'none'}} />
+            </label>
+            {error && <p style={{color:'#c0392b',fontSize:13,marginTop:12}}>{error}</p>}
+            <p style={{fontSize:11,color:'#bbb',marginTop:12}}>
+              Take a clear photo with good lighting for best results
+            </p>
+          </div>
+        )}
+
+        {/* Manual entry */}
+        {(mode === 'manual' || mode === 'nocamera') && (
           <div>
-            {error && (
-              <div
-                style={{
-                  background: "#fff8e1",
-                  border: "1px solid #f9c84a",
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  marginBottom: 16,
-                  fontSize: 13,
-                  color: "#7a5800",
-                }}
-              >
-                ⚠️ {error}. Type the barcode or product name below.
+            {(error || mode === 'nocamera') && (
+              <div style={{background:'#fff8e1',border:'1px solid #f9c84a',borderRadius:8,
+                padding:'10px 14px',marginBottom:16,fontSize:13,color:'#7a5800'}}>
+                ⚠️ {error || 'Camera not available'}. Enter the barcode or product name below.
               </div>
             )}
-            <label
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#333",
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
+            <label style={{fontSize:13,fontWeight:600,color:'#333',display:'block',marginBottom:6}}>
               Barcode number or product name
             </label>
-            <input
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "11px 14px",
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                fontSize: 15,
-                boxSizing: "border-box",
-                marginBottom: 8,
-              }}
-              placeholder="e.g. 6001067001234 or Indomie Noodles"
+            <input autoFocus
+              style={{width:'100%',padding:'11px 14px',borderRadius:8,border:'1px solid #ddd',
+                fontSize:15,boxSizing:'border-box',marginBottom:8}}
+              placeholder="e.g. 8935001727859 or Indomie Noodles"
               value={manualCode}
-              onChange={(e) => {
-                setManualCode(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) => e.key === "Enter" && submitManual()}
+              onChange={e => { setManualCode(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && submitManual()}
             />
-            <button
-              onClick={submitManual}
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: 8,
-                background: "var(--green)",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-            >
-              Use this barcode
+            {error && <p style={{color:'#c0392b',fontSize:13,margin:'0 0 8px'}}>{error}</p>}
+            <button onClick={submitManual}
+              style={{width:'100%',padding:'12px',borderRadius:8,background:'var(--green)',
+                color:'#fff',border:'none',cursor:'pointer',fontWeight:700,fontSize:14}}>
+              Use this
             </button>
           </div>
         )}
 
-        <button
-          onClick={onClose}
-          style={{
-            width: "100%",
-            marginTop: 12,
-            padding: "10px",
-            border: "1px solid #eee",
-            borderRadius: 8,
-            background: "#f5f5f5",
-            cursor: "pointer",
-            fontSize: 13,
-            color: "#666",
-          }}
-        >
+        <button onClick={handleClose} style={{
+          width:'100%', marginTop:12, padding:'10px',
+          border:'1px solid #eee', borderRadius:8,
+          background:'#f5f5f5', cursor:'pointer', fontSize:13, color:'#666'
+        }}>
           Cancel
         </button>
       </div>
     </div>
-  );
+  )
 }
