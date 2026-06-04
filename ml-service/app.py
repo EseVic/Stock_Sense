@@ -74,7 +74,24 @@ def predict():
                 "predictions": {}
             }
 
+            # has_expiry = False means shelf_life=0 or no expiry_date given
+            # In that case, skip ML for expiry_risk entirely and return "N/A"
+            has_expiry = record.get("has_expiry", True)
+            if not has_expiry or int(record.get("days_to_expiry", 9999)) == 9999:
+                has_expiry = False
+
             for task in tasks:
+                # No-expiry shortcut for expiry_risk
+                if task == "expiry_risk" and not has_expiry:
+                    row_result["predictions"][task] = {
+                        "label":          "N/A",
+                        "confidence":     100,
+                        "dt":             {"label": "N/A", "confidence": 100},
+                        "lr":             {"label": "N/A", "confidence": 100},
+                        "recommendation": f"✅ {record.get('product_name', 'This product')} has no expiry date. No expiry risk applies."
+                    }
+                    continue
+
                 dt_key    = f"{task}_dt"
                 lr_key    = f"{task}_lr"
                 scaler    = MODELS.get(f"{task}_scaler")
@@ -85,8 +102,6 @@ def predict():
                 for col in feat_cols:
                     if col not in task_df.columns:
                         task_df[col] = 0
-                # x_raw    = task_df[feat_cols].fillna(0).values
-                # x_scaled = scaler.transform(x_raw) if scaler else x_raw
                 x_frame  = task_df[feat_cols].fillna(0)
                 x_raw    = x_frame.values
                 x_scaled = scaler.transform(x_frame) if scaler else x_raw
@@ -134,6 +149,7 @@ def get_recommendation(task, label, record):
             "Medium":  f"📋 Monitor {name} closely this week. Consider a small discount to move stock faster.",
             "Low":     f"✅ {name} expiry is not a concern right now. Continue normal sales.",
             "Expired": f"🚫 Remove {name} from shelf immediately — batch has expired.",
+            "N/A":     f"✅ {name} has no expiry date. No expiry risk applies.",
         },
         "sales_velocity": {
             "Fast":     f"🚀 {name} is selling fast. Reorder soon to avoid stockout.",
@@ -162,7 +178,7 @@ def metrics():
 
 load_models()
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     if not MODELS:
         print("No models found — training now...")
         train_all_models()

@@ -3,13 +3,31 @@ const { db: dbConfig } = require("../config");
 const bcrypt = require("bcryptjs");
 
 // ── PostgreSQL pool ──────────────────────────────────────────────────────────
+// const pool = new Pool({
+//   ...dbConfig,
+//   ssl: { rejectUnauthorized: false },
+//   // keep connections alive so Render does not drop them silently
+//   idleTimeoutMillis:    60000,   
+//   connectionTimeoutMillis: 5000, 
+//   max: 10,                       
+// });
+
+const isProduction = process.env.NODE_ENV === "production";
+
 const pool = new Pool({
   ...dbConfig,
-  ssl: { rejectUnauthorized: false },
-  // keep connections alive so Render does not drop them silently
-  idleTimeoutMillis:    60000,   
-  connectionTimeoutMillis: 5000, 
-  max: 10,                       
+
+  /*
+    Render and other cloud databases normally require SSL.
+    A local PostgreSQL container does not need it.
+  */
+  ssl: isProduction
+    ? { rejectUnauthorized: false }
+    : false,
+
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 5000,
+  max: 10,
 });
 
 //  handles pool errors without crashing the process ─────────
