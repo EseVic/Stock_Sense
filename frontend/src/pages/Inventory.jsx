@@ -18,7 +18,7 @@ function exportCSV(items) {
   const headers = ['Product','Category','Qty In','Qty Sold','Qty Remaining','Unit Price (₦)','Days to Expiry','Expiry Risk','Sales Velocity','Customer Preference','Slow Mover']
   const rows = items.map(i => [
     i.product_name, i.category, i.qty_in, i.qty_sold, i.qty_remaining,
-    i.unit_price, i.days_to_expiry ?? '', i.expiry_risk ?? '',
+    i.unit_price, i.days_to_expiry < 9999 ? i.days_to_expiry : '—', i.expiry_risk ?? '',
     i.sales_velocity ?? '', i.customer_preference ?? '', i.slow_mover ?? ''
   ])
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
@@ -211,7 +211,7 @@ export default function Inventory() {
                     <td className={item.qty_remaining <= 5 ? 'td-urgent' : ''}>{item.qty_remaining}</td>
                     <td>₦{Number(item.unit_price||0).toLocaleString()}</td>
                     <td className={item.days_to_expiry<=7?'td-urgent':''}>
-                      {item.days_to_expiry!=null ? item.days_to_expiry+'d' : '—'}
+                      {item.days_to_expiry != null && item.days_to_expiry < 9999 ? item.days_to_expiry+'d' : '—'}
                     </td>
                     <td><Badge label={item.expiry_risk} type="risk" /></td>
                     <td><Badge label={item.sales_velocity} type="vel" /></td>

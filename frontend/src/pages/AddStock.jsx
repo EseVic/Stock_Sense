@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './AddStock.css'
 import BarcodeScanner from '../components/BarcodeScanner'
@@ -215,7 +216,7 @@ export default function AddStock() {
         <div className="as-result">
           <h3>✅ {result.saved} record{result.saved!==1?'s':''} saved successfully</h3>
           {result.items?.[0]?.expiry_risk && (
-            <p>Predictions generated. View them in the <a href="/predictions">Predictions</a> page.</p>
+            <p>Predictions generated. View them in the <a href="/app/predictions">Predictions</a> page.</p>
           )}
           {!result.items?.[0]?.expiry_risk && (
             <p>Records saved. Start the ML service to generate predictions.</p>
