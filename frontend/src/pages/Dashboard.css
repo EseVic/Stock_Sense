@@ -94,3 +94,30 @@ html.app-dark .pie-legend { border-top-color: #30363d; }
   .stat-grid { grid-template-columns:1fr; }
   .page-title { font-size:20px; }
 }
+/* ── ML Savings Intelligence ── */
+.savings-section { margin-bottom: 24px; }
+.section-sub     { font-size: 12px; color: var(--text-2); margin-top: -8px; margin-bottom: 12px; }
+.savings-grid    { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+
+.savings-card {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-left: 3px solid currentColor;
+}
+.savings-icon {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.savings-val   { font-family: var(--font-hd); font-size: 18px; font-weight: 700; }
+.savings-label { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.savings-sub   { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+/* dark mode */
+html.app-dark .savings-card { background: #161b22; }
