@@ -2,6 +2,58 @@ const SalesHistoryModel = require("../models/sales_history.model");
 const InventoryModel    = require("../models/inventory.model");
 const { useDB }         = require("../db");
 const { pool }          = require("../db");
+const axios             = require("axios");
+const { ML_URL }        = require("../config");
+const { applyPredictions } = require("../utils/inventory.utils");
+
+// Map DB record to ML feature names
+function toMLRecord(r) {
+  const qty_in   = r.qty_in   || 0;
+  const qty_sold = r.qty_sold || 0;
+  const qty_dmg  = r.qty_damaged || 0;
+  const shelf_life = r.shelf_life_days || 30;
+  const has_expiry = shelf_life > 0 && !!r.expiry_date;
+
+  let days_to_expiry = r.days_to_expiry || 9999;
+  if (has_expiry && r.expiry_date) {
+    const today = new Date();
+    const exp   = new Date(r.expiry_date);
+    days_to_expiry = Math.max(0, Math.round((exp - today) / (1000 * 60 * 60 * 24)));
+  }
+
+  const restock_days = has_expiry && r.restock_date && r.expiry_date
+    ? Math.max(1, Math.round((new Date(r.expiry_date) - new Date(r.restock_date)) / (1000 * 60 * 60 * 24)))
+    : Math.max(shelf_life, 1);
+
+  const weekly_sales_rate = parseFloat((qty_sold / restock_days * 7).toFixed(4));
+  const sell_through_rate = qty_in ? parseFloat((qty_sold / qty_in).toFixed(4)) : 0;
+  const wastage_rate      = qty_in ? parseFloat((qty_dmg  / qty_in).toFixed(4)) : 0;
+  const shelf_utilisation = has_expiry
+    ? parseFloat((1 - days_to_expiry / Math.max(shelf_life, 1)).toFixed(4))
+    : 0;
+
+  return {
+    product_name:         r.product_name,
+    qty_in,
+    qty_sold,
+    qty_remaining:        r.qty_remaining || 0,
+    qty_damaged:          qty_dmg,
+    shelf_life_days:      shelf_life,
+    unit_price_ngn:       r.unit_price || 0,
+    total_revenue_ngn:    (r.unit_price || 0) * qty_sold,
+    demand_forecast:      r.demand_forecast  || 0,
+    holiday_promo:        r.holiday_promo    || 0,
+    restock_count:        r.restock_count    || 1,
+    sell_through_rate,
+    wastage_rate,
+    weekly_sales_rate,
+    days_to_expiry,
+    shelf_utilisation,
+    purchase_frequency:   r.purchase_frequency || 1,
+    total_units_sold_all: qty_sold,
+    has_expiry,
+  };
+}
 
 const SalesHistoryController = {
   async getAll(req, res) {
@@ -53,9 +105,9 @@ const SalesHistoryController = {
       );
 
       // --- Sync inventory: update qty_sold and qty_remaining ---
+      let updatedInventoryId = null;
       try {
         if (inventory_id) {
-          // Update by exact inventory_id if provided
           if (useDB) {
             await pool.query(
               `UPDATE inventory
@@ -64,6 +116,7 @@ const SalesHistoryController = {
                WHERE id = $2 AND user_id = $3`,
               [qtySoldInt, inventory_id, req.user.id]
             );
+            updatedInventoryId = inventory_id;
           } else {
             const { memStore } = require("../db");
             const idx = memStore.inventory.findIndex(
@@ -72,12 +125,12 @@ const SalesHistoryController = {
             if (idx >= 0) {
               memStore.inventory[idx].qty_sold      = (memStore.inventory[idx].qty_sold || 0) + qtySoldInt;
               memStore.inventory[idx].qty_remaining = Math.max(0, (memStore.inventory[idx].qty_remaining || 0) - qtySoldInt);
+              updatedInventoryId = inventory_id;
             }
           }
         } else {
-          // Match by product name (most recent matching record for this user)
           if (useDB) {
-            await pool.query(
+            const upd = await pool.query(
               `UPDATE inventory
                SET qty_sold      = qty_sold + $1,
                    qty_remaining = GREATEST(0, qty_remaining - $1)
@@ -87,9 +140,10 @@ const SalesHistoryController = {
                    AND LOWER(product_name) = LOWER($3)
                  ORDER BY created_at DESC
                  LIMIT 1
-               )`,
+               ) RETURNING id`,
               [qtySoldInt, req.user.id, product_name]
             );
+            if (upd.rows.length > 0) updatedInventoryId = upd.rows[0].id;
           } else {
             const { memStore } = require("../db");
             const userItems = memStore.inventory
@@ -101,13 +155,38 @@ const SalesHistoryController = {
               if (idx >= 0) {
                 memStore.inventory[idx].qty_sold      = (memStore.inventory[idx].qty_sold || 0) + qtySoldInt;
                 memStore.inventory[idx].qty_remaining = Math.max(0, (memStore.inventory[idx].qty_remaining || 0) - qtySoldInt);
+                updatedInventoryId = userItems[0].id;
               }
             }
           }
         }
       } catch (syncErr) {
         console.warn("Inventory sync warning:", syncErr.message);
-        // Non-fatal: sale was still logged
+      }
+
+      // --- Auto re-predict the updated inventory item in background ---
+      if (updatedInventoryId) {
+        (async () => {
+          try {
+            const records = await InventoryModel.findByIds(
+              { userId: req.user.id, ids: [updatedInventoryId] }, useDB
+            );
+            if (records.length) {
+              const mlRecords = records.map(toMLRecord);
+              const mlRes = await axios.post(
+                `${ML_URL}/predict`,
+                { records: mlRecords },
+                { timeout: 30000 }
+              );
+              const predictions = mlRes.data.results || [];
+              const updates = applyPredictions(predictions[0]?.predictions || {});
+              await InventoryModel.updatePredictions({ id: updatedInventoryId, ...updates }, useDB);
+              console.log(`✅ Auto-predicted ${product_name} after sale`);
+            }
+          } catch (mlErr) {
+            console.log("Auto-predict after sale skipped:", mlErr.message);
+          }
+        })();
       }
 
       res.json(item);

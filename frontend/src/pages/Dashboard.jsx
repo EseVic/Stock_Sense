@@ -20,6 +20,19 @@ function StatCard({ label, value, sub, color='var(--green)', icon }) {
   )
 }
 
+function SavingsCard({ label, value, sub, color, icon }) {
+  return (
+    <div className="savings-card">
+      <div className="savings-icon" style={{background:color+'18', color}}>{icon}</div>
+      <div className="savings-body">
+        <div className="savings-val" style={{color}}>₦{Number(value).toLocaleString()}</div>
+        <div className="savings-label">{label}</div>
+        {sub && <div className="savings-sub">{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
 function PieLegend({ data }) {
   return (
     <div className="pie-legend">
@@ -58,6 +71,7 @@ export default function Dashboard() {
 
   const riskData = Object.entries(stats.byRisk || {}).map(([k,v]) => ({ name:k, value:v, fill:RISK_COLORS[k]||'#888' }))
   const velData  = Object.entries(stats.byVel  || {}).map(([k,v]) => ({ name:k, value:v, fill:VEL_COLORS[k] ||'#888' }))
+  const sv       = stats.savings || {}
 
   return (
     <div className="dash">
@@ -76,6 +90,43 @@ export default function Dashboard() {
         <StatCard label="Slow movers"    value={stats.slowMovers} sub="not selling fast enough"  icon="🐢" color="var(--amber)" />
         <StatCard label="Total revenue"  value={"₦"+Number(stats.revenue||0).toLocaleString()} sub="from sold stock" icon="₦" color="var(--green)" />
       </div>
+
+      {/* ── ML Savings Intelligence ── */}
+      {(sv.potentialLoss > 0 || sv.potentialSavings > 0 || sv.capitalTiedUp > 0) && (
+        <div className="savings-section">
+          <h3 className="section-title">💡 ML Financial Intelligence</h3>
+          <p className="section-sub">Estimated figures based on your current ML predictions</p>
+          <div className="savings-grid">
+            {sv.potentialLoss > 0 && (
+              <SavingsCard
+                label="Stock value lost to expiry"
+                value={sv.potentialLoss}
+                sub={`${sv.expiredCount} expired product${sv.expiredCount !== 1 ? 's' : ''} still on shelf`}
+                color="#C0392B"
+                icon="🚫"
+              />
+            )}
+            {sv.potentialSavings > 0 && (
+              <SavingsCard
+                label="Recoverable if discounted now"
+                value={sv.potentialSavings}
+                sub={`${sv.highRiskCount} high-risk product${sv.highRiskCount !== 1 ? 's' : ''} — act before they expire`}
+                color="#C47D0E"
+                icon="💰"
+              />
+            )}
+            {sv.capitalTiedUp > 0 && (
+              <SavingsCard
+                label="Capital tied up in slow movers"
+                value={sv.capitalTiedUp}
+                sub={`${sv.slowMoverCount} slow-moving product${sv.slowMoverCount !== 1 ? 's' : ''} — consider promotions`}
+                color="#1B7A5A"
+                icon="📦"
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {stats.alerts?.length > 0 && (
         <div className="alerts-section">

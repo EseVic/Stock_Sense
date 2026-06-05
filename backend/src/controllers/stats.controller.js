@@ -20,7 +20,7 @@ const StatsController = {
           remaining: i.qty_remaining,
           qtyIn:     i.qty_in,
           pct:       Math.round((i.qty_remaining / i.qty_in) * 100)
-        }))
+        }));
 
       // Revenue by category
       const byCat = {};
@@ -50,7 +50,34 @@ const StatsController = {
           days:     i.days_to_expiry,
         }));
 
-      res.json({ total, highRisk, slowMovers, revenue, lowStock, topCategories, byRisk, byVel, alerts });
+      // ── Savings estimate ──────────────────────────────────────────────────
+      // Potential loss = value of expired stock still sitting on shelf
+      const expiredItems = items.filter(i => i.expiry_risk === "Expired");
+      const potentialLoss = expiredItems.reduce((s, i) =>
+        s + parseFloat(i.unit_price||0) * parseInt(i.qty_remaining||0), 0);
+
+      // Savings from acting on High risk early (assume 60% of stock value saved if discounted)
+      const highRiskItems = items.filter(i => i.expiry_risk === "High");
+      const potentialSavings = highRiskItems.reduce((s, i) =>
+        s + parseFloat(i.unit_price||0) * parseInt(i.qty_remaining||0) * 0.6, 0);
+
+      // Slow mover capital tied up (money stuck in stock not moving)
+      const slowMoverItems = items.filter(i => i.slow_mover === "Yes");
+      const capitalTiedUp = slowMoverItems.reduce((s, i) =>
+        s + parseFloat(i.unit_price||0) * parseInt(i.qty_remaining||0), 0);
+
+      res.json({
+        total, highRisk, slowMovers, revenue, lowStock,
+        topCategories, byRisk, byVel, alerts,
+        savings: {
+          potentialLoss:    Math.round(potentialLoss),
+          potentialSavings: Math.round(potentialSavings),
+          capitalTiedUp:    Math.round(capitalTiedUp),
+          expiredCount:     expiredItems.length,
+          highRiskCount:    highRiskItems.length,
+          slowMoverCount:   slowMoverItems.length,
+        }
+      });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
