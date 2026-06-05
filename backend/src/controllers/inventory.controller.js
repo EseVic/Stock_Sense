@@ -2,7 +2,7 @@ const axios          = require("axios");
 const { ML_URL }     = require("../config");
 const InventoryModel = require("../models/inventory.model");
 const { useDB }      = require("../db");
-const { buildPayloadWithMeta, applyPredictions } = require("../utils/inventory.utils");
+const { buildPayload, applyPredictions } = require("../utils/inventory.utils");
 
 const InventoryController = {
   async getAll(req, res) {
@@ -22,19 +22,16 @@ const InventoryController = {
     try {
       const records   = Array.isArray(req.body) ? req.body : [req.body];
       const processed = [];
-      const metaList  = [];
 
       for (const rec of records) {
-        const { payload, has_expiry } = buildPayloadWithMeta(rec, req.user.id);
-        const item = await InventoryModel.create(payload, useDB);
+        const payload = buildPayload(rec, req.user.id);
+        const item    = await InventoryModel.create(payload, useDB);
         processed.push(item);
-        metaList.push({ has_expiry });
       }
 
       // Auto-predict via ML service
       try {
-        const mlRecords = processed.map((item, i) => ({ ...item, has_expiry: metaList[i].has_expiry }));
-        const mlRes     = await axios.post(`${ML_URL}/predict`, { records: mlRecords }, { timeout: 10000 });
+        const mlRes      = await axios.post(`${ML_URL}/predict`, { records: processed }, { timeout: 10000 });
         const predictions = mlRes.data.results || [];
         for (let i = 0; i < processed.length; i++) {
           const updates = applyPredictions(predictions[i]?.predictions || {});

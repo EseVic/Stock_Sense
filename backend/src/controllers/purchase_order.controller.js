@@ -1,7 +1,7 @@
 const PurchaseOrderModel = require("../models/purchase_order.model");
 const InventoryModel     = require("../models/inventory.model");
 const { useDB }          = require("../db");
-const { buildPayloadWithMeta, applyPredictions } = require("../utils/inventory.utils");
+const { buildPayload, applyPredictions } = require("../utils/inventory.utils");
 const axios              = require("axios");
 const { ML_URL }         = require("../config");
 
@@ -58,11 +58,11 @@ const PurchaseOrderController = {
       );
       if (!item) return res.status(404).json({ error: "Order not found" });
 
+      // When marked received -> auto-create inventory entry
       if (status === "received") {
         try {
           const restockDate = received_date || new Date().toISOString().split("T")[0];
-
-          const { payload, has_expiry } = buildPayloadWithMeta(
+          const payload = buildPayload(
             {
               product_name:       item.product_name,
               category:           item.category || "Other",
@@ -83,14 +83,16 @@ const PurchaseOrderController = {
 
           const invItem = await InventoryModel.create(payload, useDB);
 
-          // Fire ML prediction in background — don't block the response
-          axios.post(`${ML_URL}/predict`, { records: [{ ...invItem, has_expiry }] }, { timeout: 15000 })
-            .then(mlRes => {
-              const predictions = mlRes.data.results || [];
-              const updates     = applyPredictions(predictions[0]?.predictions || {});
-              return InventoryModel.updatePredictions({ id: invItem.id, ...updates }, useDB);
-            })
-            .catch(mlErr => console.log("ML prediction skipped:", mlErr.message));
+          // Auto-predict the new inventory item
+          try {
+            const mlRes       = await axios.post(`${ML_URL}/predict`, { records: [invItem] }, { timeout: 10000 });
+            const predictions = mlRes.data.results || [];
+            const updates     = applyPredictions(predictions[0]?.predictions || {});
+            await InventoryModel.updatePredictions({ id: invItem.id, ...updates }, useDB);
+            Object.assign(invItem, updates);
+          } catch (mlErr) {
+            console.log("ML prediction skipped:", mlErr.message);
+          }
 
           return res.json({ ...item, inventory_item: invItem });
         } catch (invErr) {

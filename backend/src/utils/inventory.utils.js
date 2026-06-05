@@ -4,38 +4,34 @@ function buildPayload(rec, userId) {
   const qty_dmg = parseInt(rec.qty_damaged) || 0;
   const qty_adj = parseInt(rec.qty_adjusted)|| 0;
   const qty_rem = Math.max(0, qty_in - qty_sold - qty_dmg + qty_adj);
+  const shelf_life = parseInt(rec.shelf_life_days) || 30;
 
-  const shelf_life = rec.shelf_life_days !== undefined && rec.shelf_life_days !== ''
-    ? parseInt(rec.shelf_life_days)
-    : 30;
-
-  const has_expiry = shelf_life > 0 && !!rec.expiry_date;
-
+  // Default to 9999 when no expiry date — means no expiry tracked
   let days_to_expiry = 9999;
-  if (has_expiry) {
+  if (rec.expiry_date) {
     const today = new Date();
     const exp   = new Date(rec.expiry_date);
     days_to_expiry = Math.max(0, Math.round((exp - today) / (1000 * 60 * 60 * 24)));
-  } else if (rec.days_to_expiry && parseInt(rec.days_to_expiry) !== 0) {
+  } else if (rec.days_to_expiry) {
     days_to_expiry = parseInt(rec.days_to_expiry) || 9999;
   }
 
   const restock_days =
-    rec.restock_date && rec.expiry_date && has_expiry
+    rec.restock_date && rec.expiry_date
       ? Math.max(1, Math.round((new Date(rec.expiry_date) - new Date(rec.restock_date)) / (1000 * 60 * 60 * 24)))
-      : Math.max(shelf_life, 1);
+      : shelf_life;
 
   const weekly_sales_rate  = parseFloat((qty_sold / restock_days * 7).toFixed(4));
   const sell_through_rate  = qty_in ? parseFloat((qty_sold / qty_in).toFixed(4)) : 0;
   const wastage_rate       = qty_in ? parseFloat((qty_dmg  / qty_in).toFixed(4)) : 0;
-  const shelf_utilisation  = has_expiry
+  const shelf_utilisation  = rec.expiry_date
     ? parseFloat((1 - days_to_expiry / Math.max(shelf_life, 1)).toFixed(4))
     : 0;
 
   return {
     user_id:        userId,
     product_name:   rec.product_name,
-    category:       rec.category       || 'Other',
+    category:       rec.category       || "Other",
     qty_in,
     qty_sold,
     qty_remaining:  qty_rem,
@@ -52,18 +48,8 @@ function buildPayload(rec, userId) {
     purchase_frequency: parseInt(rec.purchase_frequency) || 1,
     restock_count:      parseInt(rec.restock_count)      || 1,
     shelf_utilisation,
-    store_city: rec.store_city || 'Lagos',
+    store_city: rec.store_city || "Lagos",
   };
-}
-
-// Same as buildPayload but also returns has_expiry for ML use
-function buildPayloadWithMeta(rec, userId) {
-  const shelf_life = rec.shelf_life_days !== undefined && rec.shelf_life_days !== ''
-    ? parseInt(rec.shelf_life_days)
-    : 30;
-  const has_expiry = shelf_life > 0 && !!rec.expiry_date;
-  const payload = buildPayload(rec, userId);
-  return { payload, has_expiry };
 }
 
 function applyPredictions(preds = {}) {
@@ -76,8 +62,8 @@ function applyPredictions(preds = {}) {
     recommendation:        Object.values(preds)
                              .map(p => p?.recommendation)
                              .filter(Boolean)
-                             .join(' | ') || null,
+                             .join(" | ") || null,
   };
 }
 
-module.exports = { buildPayload, buildPayloadWithMeta, applyPredictions };
+module.exports = { buildPayload, applyPredictions };
