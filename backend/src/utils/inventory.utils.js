@@ -5,15 +5,12 @@ function buildPayload(rec, userId) {
   const qty_adj = parseInt(rec.qty_adjusted)|| 0;
   const qty_rem = Math.max(0, qty_in - qty_sold - qty_dmg + qty_adj);
 
-  // shelf_life_days: 0 means "no expiry" — preserve the 0, don't default to 30
   const shelf_life = rec.shelf_life_days !== undefined && rec.shelf_life_days !== ''
     ? parseInt(rec.shelf_life_days)
     : 30;
 
-  // has_expiry = false when shelf_life is 0 OR no expiry_date was provided
   const has_expiry = shelf_life > 0 && !!rec.expiry_date;
 
-  // days_to_expiry: 9999 signals "no expiry tracked" to the ML service
   let days_to_expiry = 9999;
   if (has_expiry) {
     const today = new Date();
@@ -49,7 +46,6 @@ function buildPayload(rec, userId) {
     expiry_date:    rec.expiry_date    || null,
     days_to_expiry,
     shelf_life_days: shelf_life,
-    has_expiry,
     weekly_sales_rate,
     sell_through_rate,
     wastage_rate,
@@ -58,6 +54,16 @@ function buildPayload(rec, userId) {
     shelf_utilisation,
     store_city: rec.store_city || 'Lagos',
   };
+}
+
+// Same as buildPayload but also returns has_expiry for ML use
+function buildPayloadWithMeta(rec, userId) {
+  const shelf_life = rec.shelf_life_days !== undefined && rec.shelf_life_days !== ''
+    ? parseInt(rec.shelf_life_days)
+    : 30;
+  const has_expiry = shelf_life > 0 && !!rec.expiry_date;
+  const payload = buildPayload(rec, userId);
+  return { payload, has_expiry };
 }
 
 function applyPredictions(preds = {}) {
@@ -74,4 +80,4 @@ function applyPredictions(preds = {}) {
   };
 }
 
-module.exports = { buildPayload, applyPredictions };
+module.exports = { buildPayload, buildPayloadWithMeta, applyPredictions };
