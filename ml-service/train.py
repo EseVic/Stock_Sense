@@ -71,6 +71,25 @@ FEATURE_COLS = sorted(set(
 TARGET_COLS = ["expiry_risk", "sales_velocity", "customer_preference", "slow_mover"]
 
 
+LABEL_MAPS = {
+    "expiry_risk": {
+        0: "Low", 1: "Medium", 2: "High", 3: "Expired",
+        "0": "Low", "1": "Medium", "2": "High", "3": "Expired"
+    },
+    "sales_velocity": {
+        0: "Slow", 1: "Moderate", 2: "Fast",
+        "0": "Slow", "1": "Moderate", "2": "Fast"
+    },
+    "customer_preference": {
+        0: "Low", 1: "Medium", 2: "High",
+        "0": "Low", "1": "Medium", "2": "High"
+    },
+    "slow_mover": {
+        0: "No", 1: "Yes",
+        "0": "No", "1": "Yes"
+    },
+}
+
 def load_data():
     paths = [
         "data/StockSense-Inventory.csv",
@@ -79,6 +98,11 @@ def load_data():
         if os.path.exists(p):
             df = pd.read_csv(p)
             print(f"Loaded dataset from {p}: {df.shape}")
+            # Map numeric labels to text labels
+            for col, mapping in LABEL_MAPS.items():
+                if col in df.columns:
+                    df[col] = df[col].map(lambda x: mapping.get(x, mapping.get(str(x), x)))
+                    print(f"  Mapped {col} labels: {df[col].unique().tolist()}")
             return df
     raise FileNotFoundError(
         "Could not find the inventory dataset. "
