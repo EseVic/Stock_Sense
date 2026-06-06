@@ -7,19 +7,23 @@ const RISK_BADGE  = { Low:'badge-green', Medium:'badge-amber', High:'badge-red',
 const VEL_BADGE   = { Fast:'badge-green', Moderate:'badge-amber', Slow:'badge-red', '':'badge-gray' }
 const PREF_BADGE  = { High:'badge-green', Medium:'badge-amber', Low:'badge-gray' }
 
+const CATEGORIES = ['Grains & Cereals','Pasta & Noodles','Cooking Oils & Fats','Condiments & Seasonings',
+  'Beverages','Snacks & Confectionery','Canned & Packaged Foods','Fresh & Perishable',
+  'Personal Care','Baby & Infant','Household Essentials','Other']
+
 function Badge({ label, type='risk' }) {
   if (!label) return <span className="badge badge-gray">—</span>
   const cls = type==='risk' ? RISK_BADGE[label] : type==='vel' ? VEL_BADGE[label] : PREF_BADGE[label]
   return <span className={`badge ${cls||'badge-gray'}`}>{label}</span>
 }
 
-// ── CSV export helper ──
 function exportCSV(items) {
   const headers = ['Product','Category','Qty In','Qty Sold','Qty Remaining','Unit Price (₦)','Days to Expiry','Expiry Risk','Sales Velocity','Customer Preference','Slow Mover']
   const rows = items.map(i => [
     i.product_name, i.category, i.qty_in, i.qty_sold, i.qty_remaining,
-    i.unit_price, i.days_to_expiry < 9999 ? i.days_to_expiry : '—', i.expiry_risk ?? '',
-    i.sales_velocity ?? '', i.customer_preference ?? '', i.slow_mover ?? ''
+    i.unit_price,
+    i.days_to_expiry < 9999 ? i.days_to_expiry : '—',
+    i.expiry_risk ?? '', i.sales_velocity ?? '', i.customer_preference ?? '', i.slow_mover ?? ''
   ])
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type:'text/csv' })
@@ -29,14 +33,13 @@ function exportCSV(items) {
   a.click(); URL.revokeObjectURL(url)
 }
 
-// ── Print helper ──
 function printTable(items) {
   const rows = items.map(i => `
     <tr>
       <td>${i.product_name}</td><td>${i.category}</td>
       <td>${i.qty_in}</td><td>${i.qty_sold}</td><td>${i.qty_remaining}</td>
       <td>₦${Number(i.unit_price||0).toLocaleString()}</td>
-      <td>${i.days_to_expiry ?? '—'}</td>
+      <td>${i.days_to_expiry != null && i.days_to_expiry < 9999 ? i.days_to_expiry+'d' : '—'}</td>
       <td>${i.expiry_risk ?? '—'}</td><td>${i.sales_velocity ?? '—'}</td>
       <td>${i.customer_preference ?? '—'}</td><td>${i.slow_mover ?? '—'}</td>
     </tr>`).join('')
@@ -67,17 +70,116 @@ function printTable(items) {
   w.document.write(html); w.document.close(); w.print()
 }
 
+// ── Edit Modal ──────────────────────────────────────────────────────────────
+function EditModal({ item, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    product_name:   item.product_name   || '',
+    category:       item.category       || 'Grains & Cereals',
+    unit_price:     item.unit_price     || '',
+    qty_in:         item.qty_in         || '',
+    qty_sold:       item.qty_sold       || '0',
+    qty_damaged:    item.qty_damaged    || '0',
+    qty_adjusted:   item.qty_adjusted   || '0',
+    expiry_date:    item.expiry_date    ? item.expiry_date.split('T')[0] : '',
+    shelf_life_days: item.shelf_life_days || '',
+    store_city:     item.store_city     || 'Lagos',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
+
+  const set = k => e => setForm({ ...form, [k]: e.target.value })
+
+  const save = async () => {
+    if (!form.product_name || !form.qty_in) return setError('Product name and quantity in are required')
+    setSaving(true); setError('')
+    try {
+      await axios.patch(`/api/inventory/${item.id}`, form)
+      onSaved()
+      onClose()
+    } catch(e) {
+      setError(e.response?.data?.error || 'Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">Edit — {item.product_name}</div>
+
+        <div className="modal-grid">
+          <div className="modal-full">
+            <label className="field-label">Product name</label>
+            <input className="field-input" value={form.product_name} onChange={set('product_name')} />
+          </div>
+          <div>
+            <label className="field-label">Category</label>
+            <select className="field-input" value={form.category} onChange={set('category')}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Unit price (₦)</label>
+            <input className="field-input" type="number" value={form.unit_price} onChange={set('unit_price')} />
+          </div>
+          <div>
+            <label className="field-label">Qty in</label>
+            <input className="field-input" type="number" value={form.qty_in} onChange={set('qty_in')} />
+          </div>
+          <div>
+            <label className="field-label">Qty sold</label>
+            <input className="field-input" type="number" value={form.qty_sold} onChange={set('qty_sold')} />
+          </div>
+          <div>
+            <label className="field-label">Qty damaged</label>
+            <input className="field-input" type="number" value={form.qty_damaged} onChange={set('qty_damaged')} />
+          </div>
+          <div>
+            <label className="field-label">Qty adjusted</label>
+            <input className="field-input" type="number" value={form.qty_adjusted} onChange={set('qty_adjusted')} />
+          </div>
+          <div>
+            <label className="field-label">Expiry date</label>
+            <input className="field-input" type="date" value={form.expiry_date} onChange={set('expiry_date')} />
+          </div>
+          <div>
+            <label className="field-label">Shelf life (days)</label>
+            <input className="field-input" type="number" value={form.shelf_life_days} onChange={set('shelf_life_days')} />
+          </div>
+          <div>
+            <label className="field-label">Store city</label>
+            <select className="field-input" value={form.store_city} onChange={set('store_city')}>
+              {['Lagos','Abuja','Kano','Port Harcourt','Ibadan','Benin City','Kaduna','Aba','Enugu','Onitsha','Warri','Ilorin','Jos','Owerri','Uyo'].map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {error && <div style={{color:'var(--red)',fontSize:12,marginTop:8}}>{error}</div>}
+
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onClose}>Cancel</button>
+          <button className="modal-save" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Inventory() {
-  const [items,      setItems]   = useState([])
-  const [allItems,   setAll]     = useState([])   // full list for export/print
-  const [total,      setTotal]   = useState(0)
-  const [page,       setPage]    = useState(1)
-  const [search,     setSearch]  = useState('')
-  const [risk,       setRisk]    = useState('')
-  const [loading,    setLoading] = useState(true)
-  const [predicting, setPred]    = useState(false)
-  const [lowStock,   setLow]     = useState([])
-  const [showLow,    setShowLow] = useState(false)
+  const [items,      setItems]    = useState([])
+  const [allItems,   setAll]      = useState([])
+  const [total,      setTotal]    = useState(0)
+  const [page,       setPage]     = useState(1)
+  const [search,     setSearch]   = useState('')
+  const [risk,       setRisk]     = useState('')
+  const [loading,    setLoading]  = useState(true)
+  const [predicting, setPred]     = useState(false)
+  const [lowStock,   setLow]      = useState([])
+  const [showLow,    setShowLow]  = useState(false)
+  const [editItem,   setEditItem] = useState(null)
   const LIMIT = 20
 
   const load = async () => {
@@ -90,7 +192,6 @@ export default function Inventory() {
       setItems(page_r.data.items); setTotal(page_r.data.total)
       const all = all_r.data.items || []
       setAll(all)
-      // low stock: remaining <= 10% of qty_in or remaining <= 5 units
       setLow(all.filter(i => i.qty_remaining != null && i.qty_in > 0 &&
         (i.qty_remaining <= 5 || (i.qty_remaining / i.qty_in) <= 0.1)))
     } catch(e) { console.error(e) }
@@ -99,25 +200,15 @@ export default function Inventory() {
 
   useEffect(() => { load() }, [page, search, risk])
 
-  // const runPredictions = async () => {
-  //   setPred(true)
-  //   try { await axios.post('/api/predict', {}); await load() }
-  //   catch(e) { alert('ML service not running. Start it first.') }
-  //   finally  { setPred(false) }
-  // }
-
   const runPredictions = async () => {
-  setPred(true);
-  try {
-    const ids = items.map(i => i.id); // only current page
-    await axios.post('/api/predict', { ids });
-    await load();
-  } catch (e) {
-    alert('Prediction failed: ' + e.message);
-  } finally {
-    setPred(false);
+    setPred(true)
+    try {
+      const ids = items.map(i => i.id)
+      await axios.post('/api/predict', { ids })
+      await load()
+    } catch(e) { alert('Prediction failed: ' + e.message) }
+    finally    { setPred(false) }
   }
-}
 
   const deleteItem = async id => {
     if (!confirm('Delete this record?')) return
@@ -125,7 +216,7 @@ export default function Inventory() {
     load()
   }
 
-  const pages = Math.ceil(total/LIMIT)
+  const pages = Math.ceil(total / LIMIT)
 
   return (
     <div className="inv-page">
@@ -140,19 +231,14 @@ export default function Inventory() {
               ⚠️ {lowStock.length} low stock
             </button>
           )}
-          <button className="icon-btn" onClick={() => exportCSV(allItems)} title="Export to CSV">
-            ⬇ CSV
-          </button>
-          <button className="icon-btn" onClick={() => printTable(allItems)} title="Print / Save as PDF">
-            🖨 Print
-          </button>
+          <button className="icon-btn" onClick={() => exportCSV(allItems)} title="Export to CSV">⬇ CSV</button>
+          <button className="icon-btn" onClick={() => printTable(allItems)} title="Print / Save as PDF">🖨 Print</button>
           <button className="pred-btn" onClick={runPredictions} disabled={predicting}>
             {predicting ? '⟳ Running…' : '◎ Run predictions'}
           </button>
         </div>
       </div>
 
-      {/* ── low stock alert panel ── */}
       {showLow && lowStock.length > 0 && (
         <div className="low-stock-panel">
           <div className="lsp-header">
@@ -165,7 +251,7 @@ export default function Inventory() {
                 <div className="lsp-name">{i.product_name}</div>
                 <div className="lsp-detail">
                   {i.qty_remaining} units remaining of {i.qty_in} —
-                  <span className="lsp-pct"> {Math.round((i.qty_remaining/i.qty_in)*100)}% left</span>
+                  <span className="lsp-pct"> {Math.round((i.qty_remaining / i.qty_in) * 100)}% left</span>
                 </div>
               </div>
             ))}
@@ -175,8 +261,8 @@ export default function Inventory() {
 
       <div className="inv-filters">
         <input className="filter-input" placeholder="Search products…" value={search}
-          onChange={e=>{ setSearch(e.target.value); setPage(1) }} />
-        <select className="filter-input" value={risk} onChange={e=>{ setRisk(e.target.value); setPage(1) }}>
+          onChange={e => { setSearch(e.target.value); setPage(1) }} />
+        <select className="filter-input" value={risk} onChange={e => { setRisk(e.target.value); setPage(1) }}>
           <option value="">All risk levels</option>
           <option>Low</option><option>Medium</option><option>High</option><option>Expired</option>
         </select>
@@ -195,44 +281,56 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody>
-                {items.length===0 && <tr><td colSpan={13} style={{textAlign:'center',color:'var(--gray)',padding:'32px'}}>No records found</td></tr>}
+                {items.length === 0 && (
+                  <tr><td colSpan={13} style={{ textAlign: 'center', color: 'var(--gray)', padding: '32px' }}>No records found</td></tr>
+                )}
                 {items.map((item, idx) => (
                   <tr key={item.id} className={item.qty_remaining <= 5 ? 'tr-low' : ''}>
-                    <td style={{color:'var(--gray)',fontSize:12,minWidth:32}}>{(page-1)*LIMIT + idx + 1}</td>
-                    {/* <td className="td-name">
-                      {item.product_name} */}
-                      <td className="td-name" style={{display:'flex',alignItems:'center',gap:6}}>
-                        <Link to={`/app/inventory/${encodeURIComponent(item.product_name)}`} className="prod-link" title="View product detail">{item.product_name}</Link>
+                    <td style={{ color: 'var(--gray)', fontSize: 12, minWidth: 32 }}>{(page - 1) * LIMIT + idx + 1}</td>
+                    <td className="td-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Link to={`/app/inventory/${encodeURIComponent(item.product_name)}`} className="prod-link" title="View product detail">
+                        {item.product_name}
+                      </Link>
                       {item.qty_remaining <= 5 && <span className="low-badge">Low</span>}
                     </td>
                     <td className="td-cat">{item.category}</td>
                     <td>{item.qty_in}</td>
                     <td>{item.qty_sold}</td>
                     <td className={item.qty_remaining <= 5 ? 'td-urgent' : ''}>{item.qty_remaining}</td>
-                    <td>₦{Number(item.unit_price||0).toLocaleString()}</td>
-                    <td className={item.days_to_expiry<=7?'td-urgent':''}>
-                      {item.days_to_expiry != null && item.days_to_expiry < 9999 ? item.days_to_expiry+'d' : '—'}
+                    <td>₦{Number(item.unit_price || 0).toLocaleString()}</td>
+                    <td className={item.days_to_expiry <= 7 && item.days_to_expiry < 9999 ? 'td-urgent' : ''}>
+                      {item.days_to_expiry != null && item.days_to_expiry < 9999 ? item.days_to_expiry + 'd' : '—'}
                     </td>
                     <td><Badge label={item.expiry_risk} type="risk" /></td>
                     <td><Badge label={item.sales_velocity} type="vel" /></td>
                     <td><Badge label={item.customer_preference} type="pref" /></td>
                     <td><Badge label={item.slow_mover} type="pref" /></td>
-                    <td>
-                      <button className="td-del" onClick={()=>deleteItem(item.id)} title="Delete">✕</button>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button className="td-edit" onClick={() => setEditItem(item)} title="Edit">✏️</button>
+                      <button className="td-del"  onClick={() => deleteItem(item.id)} title="Delete">✕</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {pages>1 && (
+
+          {pages > 1 && (
             <div className="pager">
-              <button className="pg-btn" disabled={page===1} onClick={()=>setPage(p=>p-1)}>‹ Prev</button>
+              <button className="pg-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Prev</button>
               <span className="pg-info">Page {page} of {pages}</span>
-              <button className="pg-btn" disabled={page===pages} onClick={()=>setPage(p=>p+1)}>Next ›</button>
+              <button className="pg-btn" disabled={page === pages} onClick={() => setPage(p => p + 1)}>Next ›</button>
             </div>
           )}
         </>
+      )}
+
+      {editItem && (
+        <EditModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); load() }}
+        />
       )}
     </div>
   )
