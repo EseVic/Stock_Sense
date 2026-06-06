@@ -68,6 +68,162 @@ function printPredictions(items) {
   w.document.write(html); w.document.close(); w.print()
 }
 
+// ── What-If Simulator ──────────────────────────────────────────────────────
+function WhatIfSimulator({ items }) {
+  const [selectedId,  setSelectedId]  = useState('')
+  const [qtySold,     setQtySold]     = useState('')
+  const [daysLeft,    setDaysLeft]    = useState('')
+  const [result,      setResult]      = useState(null)
+  const [running,     setRunning]     = useState(false)
+  const [error,       setError]       = useState(null)
+
+  const selected = items.find(i => i.id === parseInt(selectedId))
+
+  const runSimulation = async () => {
+    if (!selected) return
+    setRunning(true); setError(null); setResult(null)
+    try {
+      const res = await axios.post('/api/predict/simulate', {
+        inventory_id:  selected.id,
+        qty_sold:      qtySold     !== '' ? parseInt(qtySold)  : selected.qty_sold,
+        days_to_expiry: daysLeft   !== '' ? parseInt(daysLeft) : selected.days_to_expiry,
+      })
+      setResult(res.data)
+    } catch(e) {
+      setError('Simulation failed. Make sure the ML service is running.')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const reset = () => { setResult(null); setError(null); setQtySold(''); setDaysLeft('') }
+
+  return (
+    <div className="whatif-box">
+      <div className="whatif-header">
+        <div>
+          <h3 className="whatif-title">🔮 What-If Simulator</h3>
+          <p className="whatif-sub">See how changes affect ML predictions before committing</p>
+        </div>
+      </div>
+
+      <div className="whatif-form">
+        <div className="whatif-field">
+          <label className="field-label">Select product</label>
+          <select
+            className="field-input"
+            value={selectedId}
+            onChange={e => { setSelectedId(e.target.value); reset() }}
+          >
+            <option value="">— choose a product —</option>
+            {items.map(i => (
+              <option key={i.id} value={i.id}>
+                {i.product_name} ({i.qty_remaining} remaining)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selected && (
+          <>
+            <div className="whatif-current">
+              <span className="wc-label">Current values:</span>
+              <span className="wc-chip">Sold: {selected.qty_sold}</span>
+              <span className="wc-chip">Remaining: {selected.qty_remaining}</span>
+              <span className="wc-chip">Days to expiry: {selected.days_to_expiry < 9999 ? selected.days_to_expiry : '—'}</span>
+            </div>
+
+            <div className="whatif-inputs">
+              <div className="whatif-field">
+                <label className="field-label">What if total units sold were…</label>
+                <input
+                  className="field-input"
+                  type="number" min="0" max={selected.qty_in}
+                  placeholder={`Current: ${selected.qty_sold}`}
+                  value={qtySold}
+                  onChange={e => { setQtySold(e.target.value); setResult(null) }}
+                />
+              </div>
+              {selected.days_to_expiry < 9999 && (
+                <div className="whatif-field">
+                  <label className="field-label">What if days to expiry were…</label>
+                  <input
+                    className="field-input"
+                    type="number" min="0"
+                    placeholder={`Current: ${selected.days_to_expiry}`}
+                    value={daysLeft}
+                    onChange={e => { setDaysLeft(e.target.value); setResult(null) }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              className="whatif-run-btn"
+              onClick={runSimulation}
+              disabled={running || (qtySold === '' && daysLeft === '')}
+            >
+              {running ? '⟳ Simulating…' : '🔮 Run simulation'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {error && <div className="whatif-error">{error}</div>}
+
+      {result && (
+        <div className="whatif-result">
+          <div className="wr-title">Simulation result for <strong>{selected?.product_name}</strong></div>
+          <div className="wr-compare">
+
+            <div className="wr-col">
+              <div className="wr-col-title">Current predictions</div>
+              {[
+                { label:'Expiry risk',    val: selected?.expiry_risk        || '—', color: RISK_COLOR[selected?.expiry_risk||''] },
+                { label:'Sales velocity', val: selected?.sales_velocity     || '—', color: VEL_COLOR[selected?.sales_velocity||''] },
+                { label:'Preference',     val: selected?.customer_preference|| '—', color: '#1B7A5A' },
+                { label:'Slow mover',     val: selected?.slow_mover         || '—', color: selected?.slow_mover==='Yes'?'#C0392B':'#1B7A5A' },
+              ].map(r => (
+                <div key={r.label} className="wr-row">
+                  <span className="wr-row-label">{r.label}</span>
+                  <span className="wr-badge" style={{background:r.color+'22', color:r.color}}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="wr-arrow">→</div>
+
+            <div className="wr-col wr-col-new">
+              <div className="wr-col-title">Simulated predictions</div>
+              {[
+                { label:'Expiry risk',    val: result.predictions?.expiry_risk?.label        || '—', color: RISK_COLOR[result.predictions?.expiry_risk?.label||''] },
+                { label:'Sales velocity', val: result.predictions?.sales_velocity?.label     || '—', color: VEL_COLOR[result.predictions?.sales_velocity?.label||''] },
+                { label:'Preference',     val: result.predictions?.customer_preference?.label|| '—', color: '#1B7A5A' },
+                { label:'Slow mover',     val: result.predictions?.slow_mover?.label         || '—', color: result.predictions?.slow_mover?.label==='Yes'?'#C0392B':'#1B7A5A' },
+              ].map(r => (
+                <div key={r.label} className="wr-row">
+                  <span className="wr-row-label">{r.label}</span>
+                  <span className="wr-badge" style={{background:r.color+'22', color:r.color}}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {result.recommendations && (
+            <div className="wr-recs">
+              {result.recommendations.map((r,i) => (
+                <div key={i} className="wr-rec">{r}</div>
+              ))}
+            </div>
+          )}
+
+          <button className="whatif-reset-btn" onClick={reset}>Run another simulation</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PredCard({ item, onPredict }) {
   const [open,    setOpen]    = useState(false)
   const [running, setRunning] = useState(false)
@@ -137,7 +293,7 @@ function PredCard({ item, onPredict }) {
           )}
           <div className="pred-meta">
             <span>Confidence: <strong>{conf}%</strong></span>
-            <span>Days to expiry: <strong>{item.days_to_expiry!=null?item.days_to_expiry+'d':'—'}</strong></span>
+            <span>Days to expiry: <strong>{item.days_to_expiry!=null&&item.days_to_expiry<9999?item.days_to_expiry+'d':'—'}</strong></span>
             <span>Sell-through: <strong>{item.sell_through_rate!=null?(item.sell_through_rate*100).toFixed(1)+'%':'—'}</strong></span>
             <span>Weekly sales rate: <strong>{item.weekly_sales_rate!=null?Number(item.weekly_sales_rate).toFixed(2)+'/wk':'—'}</strong></span>
           </div>
@@ -152,6 +308,7 @@ export default function Predictions() {
   const [filter,  setFilter]  = useState('all')
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
+  const [showSim, setShowSim] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -167,7 +324,7 @@ export default function Predictions() {
   const runAll = async () => {
     setRunning(true)
     try { await axios.post('/api/predict', {}); await load() }
-    catch(e) { alert('ML service not available. Make sure it is running on port 5001.') }
+    catch(e) { alert('ML service not available. Make sure it is running.') }
     finally  { setRunning(false) }
   }
 
@@ -176,7 +333,7 @@ export default function Predictions() {
       const res = await axios.post(`/api/predict/${itemId}`)
       const updated = res.data.results?.[0]
       if (updated) setItems(prev => prev.map(i => i.id===updated.id ? {...i,...updated} : i))
-    } catch(e) { alert('ML service not available. Make sure it is running on port 5001.') }
+    } catch(e) { alert('ML service not available.') }
   }
 
   const FILTERS = [
@@ -205,11 +362,21 @@ export default function Predictions() {
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           <button className="icon-btn" onClick={() => exportPredCSV(filtered)} title="Export to CSV">⬇ CSV</button>
           <button className="icon-btn" onClick={() => printPredictions(filtered)} title="Print / Save as PDF">🖨 Print</button>
+          <button
+            className="icon-btn"
+            style={showSim?{background:'var(--green)',color:'#fff'}:{}}
+            onClick={() => setShowSim(!showSim)}
+            title="What-If Simulator"
+          >
+            🔮 Simulator
+          </button>
           <button className="pred-run-btn" onClick={runAll} disabled={running}>
             {running ? '⟳ Running ML…' : '◎ Run all predictions'}
           </button>
         </div>
       </div>
+
+      {showSim && <WhatIfSimulator items={items} />}
 
       <div className="pred-filter-bar">
         {FILTERS.map(f=>(

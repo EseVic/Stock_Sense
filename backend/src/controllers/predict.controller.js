@@ -1,11 +1,11 @@
-const axios = require("axios");
-const { ML_URL } = require("../config");
+const axios          = require("axios");
+const { ML_URL }     = require("../config");
 const InventoryModel = require("../models/inventory.model");
-const { useDB } = require("../db");
+const { useDB }      = require("../db");
 const { applyPredictions } = require("../utils/inventory.utils");
 
 const PredictController = {
-  // Predict all (or specific IDs via body)
+
   async predict(req, res) {
     try {
       const { ids } = req.body;
@@ -42,7 +42,6 @@ const PredictController = {
     }
   },
 
-  // Predict a single inventory item by its ID
   async predictOne(req, res) {
     try {
       const itemId = parseInt(req.params.id);
@@ -71,18 +70,84 @@ const PredictController = {
         results: [{ ...records[0], predictions: predictions[0]?.predictions }],
       });
     } catch (e) {
-      // res.status(500).json({ error: e.message });
       console.error("ML prediction error:", {
         mlUrl: ML_URL,
         message: e.message,
         code: e.code,
         response: e.response?.data,
       });
-
       res.status(500).json({
         error: "Prediction failed",
         details: e.response?.data || e.message,
       });
+    }
+  },
+
+  // What-If Simulator — runs ML on modified values without saving to DB
+  async simulate(req, res) {
+    try {
+      const { inventory_id, qty_sold, days_to_expiry } = req.body;
+      if (!inventory_id) return res.status(400).json({ error: "inventory_id is required" });
+
+      // Load real record
+      const records = await InventoryModel.findByIds(
+        { userId: req.user.id, ids: [parseInt(inventory_id)] },
+        useDB,
+      );
+      if (!records.length) return res.status(404).json({ error: "Item not found" });
+
+      const base = records[0];
+
+      // Build simulated record — override only what user changed
+      const simQtySold = qty_sold      !== undefined ? parseInt(qty_sold)      : base.qty_sold;
+      const simDays    = days_to_expiry !== undefined ? parseInt(days_to_expiry) : base.days_to_expiry;
+      const simRemaining = Math.max(0, base.qty_in - simQtySold - (base.qty_damaged || 0));
+
+      const shelf_life  = base.shelf_life_days || 30;
+      const has_expiry  = shelf_life > 0 && !!base.expiry_date && simDays < 9999;
+      const restock_days = has_expiry && base.restock_date && base.expiry_date
+        ? Math.max(1, Math.round((new Date(base.expiry_date) - new Date(base.restock_date)) / (1000 * 60 * 60 * 24)))
+        : Math.max(shelf_life, 1);
+
+      const simRecord = {
+        ...base,
+        qty_sold:          simQtySold,
+        qty_remaining:     simRemaining,
+        days_to_expiry:    simDays,
+        has_expiry,
+        sell_through_rate: base.qty_in ? parseFloat((simQtySold / base.qty_in).toFixed(4)) : 0,
+        weekly_sales_rate: parseFloat((simQtySold / restock_days * 7).toFixed(4)),
+        shelf_utilisation: has_expiry
+          ? parseFloat((1 - simDays / Math.max(shelf_life, 1)).toFixed(4))
+          : 0,
+      };
+
+      // Send to ML — no DB save
+      const mlRes = await axios.post(
+        `${ML_URL}/predict`,
+        { records: [simRecord] },
+        { timeout: 30000 },
+      );
+      const predictions = mlRes.data.results?.[0]?.predictions || {};
+
+      // Build recommendation list
+      const recommendations = Object.values(predictions)
+        .map(p => p?.recommendation)
+        .filter(Boolean);
+
+      res.json({
+        product_name:    base.product_name,
+        simulated_values: {
+          qty_sold:      simQtySold,
+          qty_remaining: simRemaining,
+          days_to_expiry: simDays < 9999 ? simDays : null,
+        },
+        predictions,
+        recommendations,
+      });
+    } catch (e) {
+      console.error("Simulate error:", e.message);
+      res.status(500).json({ error: "Simulation failed", details: e.message });
     }
   },
 };

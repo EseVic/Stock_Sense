@@ -1,6 +1,5 @@
 """
 StockSense ML Service — Flask API
-Trains and serves 8 models (Decision Tree + Logistic Regression) × 4 prediction tasks
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -74,14 +73,11 @@ def predict():
                 "predictions": {}
             }
 
-            # has_expiry = False means shelf_life=0 or no expiry_date given
-            # In that case, skip ML for expiry_risk entirely and return "N/A"
-            has_expiry = record.get("has_expiry", True)
-            if not has_expiry or int(record.get("days_to_expiry", 9999)) == 9999:
-                has_expiry = False
+            # If no expiry date, skip ML for expiry_risk and return N/A
+            has_expiry = bool(record.get("expiry_date")) and int(record.get("days_to_expiry", 9999)) != 9999
 
             for task in tasks:
-                # No-expiry shortcut for expiry_risk
+
                 if task == "expiry_risk" and not has_expiry:
                     row_result["predictions"][task] = {
                         "label":          "N/A",

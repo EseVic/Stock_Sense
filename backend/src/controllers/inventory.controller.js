@@ -1,7 +1,7 @@
 const axios          = require("axios");
 const { ML_URL }     = require("../config");
 const InventoryModel = require("../models/inventory.model");
-const { useDB }      = require("../db");
+const { useDB, pool } = require("../db");
 const { buildPayload, applyPredictions } = require("../utils/inventory.utils");
 
 const InventoryController = {
@@ -31,7 +31,7 @@ const InventoryController = {
 
       // Auto-predict via ML service
       try {
-        const mlRes      = await axios.post(`${ML_URL}/predict`, { records: processed }, { timeout: 10000 });
+        const mlRes     = await axios.post(`${ML_URL}/predict`, { records: processed }, { timeout: 10000 });
         const predictions = mlRes.data.results || [];
         for (let i = 0; i < processed.length; i++) {
           const updates = applyPredictions(predictions[i]?.predictions || {});
@@ -43,6 +43,59 @@ const InventoryController = {
       }
 
       res.json({ saved: processed.length, items: processed });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  },
+
+  async update(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      const {
+        product_name, category, unit_price, qty_in, qty_sold,
+        qty_damaged, qty_adjusted, expiry_date, shelf_life_days, store_city
+      } = req.body;
+
+      if (!product_name || !qty_in) {
+        return res.status(400).json({ error: "Product name and quantity in are required" });
+      }
+
+      const qty_remaining = Math.max(0,
+        parseInt(qty_in) - parseInt(qty_sold || 0) - parseInt(qty_damaged || 0) + parseInt(qty_adjusted || 0)
+      );
+
+      if (useDB) {
+        const r = await pool.query(
+          `UPDATE inventory
+           SET product_name=$1, category=$2, unit_price=$3, qty_in=$4, qty_sold=$5,
+               qty_damaged=$6, qty_adjusted=$7, qty_remaining=$8,
+               expiry_date=$9, shelf_life_days=$10, store_city=$11
+           WHERE id=$12 AND user_id=$13
+           RETURNING *`,
+          [
+            product_name, category || 'Other', parseFloat(unit_price || 0),
+            parseInt(qty_in), parseInt(qty_sold || 0),
+            parseInt(qty_damaged || 0), parseInt(qty_adjusted || 0), qty_remaining,
+            expiry_date || null, parseInt(shelf_life_days || 0), store_city || 'Lagos',
+            parseInt(id), userId
+          ]
+        );
+        if (!r.rows.length) return res.status(404).json({ error: "Item not found" });
+        return res.json(r.rows[0]);
+      } else {
+        const { memStore } = require("../db");
+        const idx = memStore.inventory.findIndex(i => i.id === parseInt(id) && i.user_id === userId);
+        if (idx < 0) return res.status(404).json({ error: "Item not found" });
+        Object.assign(memStore.inventory[idx], {
+          product_name, category, unit_price: parseFloat(unit_price || 0),
+          qty_in: parseInt(qty_in), qty_sold: parseInt(qty_sold || 0),
+          qty_damaged: parseInt(qty_damaged || 0), qty_adjusted: parseInt(qty_adjusted || 0),
+          qty_remaining, expiry_date: expiry_date || null,
+          shelf_life_days: parseInt(shelf_life_days || 0), store_city: store_city || 'Lagos',
+        });
+        return res.json(memStore.inventory[idx]);
+      }
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
