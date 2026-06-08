@@ -212,10 +212,10 @@ export default function ModelMetrics() {
         <div className="empty-metrics">
           <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
           <h2>No models trained yet</h2>
-          <p>Click "Train / Retrain models" above to train all 8 models on your dataset.</p>
-          <p style={{ marginTop: 8, fontSize: 12, color: 'var(--gray)' }}>
-            Make sure <code>03_inventory_cleaned.csv</code> is in the <code>ml-service/data/</code> folder first.
-          </p>
+          <p>Click "Train / Retrain models" above to train all models.</p>
+          {/* <p style={{ marginTop: 8, fontSize: 12, color: 'var(--gray)' }}>
+            Make sure <code>StockSense-Inventory.csv</code> is in the <code>ml-service/data/</code> folder first.
+          </p> */}
         </div>
       )}
     </div>
