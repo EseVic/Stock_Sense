@@ -161,14 +161,14 @@ const InventoryModel = require("../models/inventory.model");
 const { useDB }      = require("../db");
 const { applyPredictions } = require("../utils/inventory.utils");
 
-// Recalculate features live and map DB field names to ML field names
+// Map DB record to ML feature names and recalculate live features
 function toMLRecord(r) {
   const qty_in   = r.qty_in   || 0;
   const qty_sold = r.qty_sold || 0;
   const qty_dmg  = r.qty_damaged || 0;
   const shelf_life = r.shelf_life_days || 30;
 
-  // Recalculate days_to_expiry from today — not from stale DB value
+  // Recalculate days_to_expiry from today — not stale DB value
   let days_to_expiry = 9999;
   const has_expiry = shelf_life > 0 && !!r.expiry_date;
   if (has_expiry) {
@@ -181,7 +181,6 @@ function toMLRecord(r) {
     ? Math.max(1, Math.round((new Date(r.expiry_date) - new Date(r.restock_date)) / (1000 * 60 * 60 * 24)))
     : Math.max(shelf_life, 1);
 
-  // Recalculate all derived features from current qty values
   const weekly_sales_rate = parseFloat((qty_sold / restock_days * 7).toFixed(4));
   const sell_through_rate = qty_in ? parseFloat((qty_sold / qty_in).toFixed(4)) : 0;
   const wastage_rate      = qty_in ? parseFloat((qty_dmg  / qty_in).toFixed(4)) : 0;
@@ -191,16 +190,15 @@ function toMLRecord(r) {
 
   return {
     product_name:         r.product_name,
-    // Map DB field names → ML field names
     qty_in,
     qty_sold,
     qty_remaining:        r.qty_remaining || 0,
     qty_damaged:          qty_dmg,
     shelf_life_days:      shelf_life,
-    unit_price_ngn:       r.unit_price || 0,        // DB=unit_price → ML=unit_price_ngn
+    unit_price_ngn:       r.unit_price || 0,
     total_revenue_ngn:    (r.unit_price || 0) * qty_sold,
-    demand_forecast:      r.demand_forecast  || 0,
-    holiday_promo:        r.holiday_promo    || 0,
+    demand_forecast:      0,
+    holiday_promo:        0,
     restock_count:        r.restock_count    || 1,
     sell_through_rate,
     wastage_rate,
@@ -209,7 +207,6 @@ function toMLRecord(r) {
     shelf_utilisation,
     purchase_frequency:   r.purchase_frequency || 1,
     total_units_sold_all: qty_sold,
-    // Expiry control flag
     expiry_date:          r.expiry_date || null,
     has_expiry,
   };
@@ -285,12 +282,6 @@ const PredictController = {
         results: [{ ...records[0], predictions: predictions[0]?.predictions }],
       });
     } catch (e) {
-      console.error("ML prediction error:", {
-        mlUrl: ML_URL,
-        message: e.message,
-        code: e.code,
-        response: e.response?.data,
-      });
       res.status(500).json({
         error: "Prediction failed",
         details: e.response?.data || e.message,
@@ -313,7 +304,6 @@ const PredictController = {
       const simQtySold   = qty_sold       !== undefined ? parseInt(qty_sold)       : base.qty_sold;
       const simDays      = days_to_expiry !== undefined ? parseInt(days_to_expiry) : base.days_to_expiry;
       const simRemaining = Math.max(0, base.qty_in - simQtySold - (base.qty_damaged || 0));
-
       const shelf_life   = base.shelf_life_days || 30;
       const has_expiry   = shelf_life > 0 && !!base.expiry_date && simDays < 9999;
       const restock_days = has_expiry && base.restock_date && base.expiry_date
@@ -329,8 +319,8 @@ const PredictController = {
         shelf_life_days:      shelf_life,
         unit_price_ngn:       base.unit_price || 0,
         total_revenue_ngn:    (base.unit_price || 0) * simQtySold,
-        demand_forecast:      base.demand_forecast  || 0,
-        holiday_promo:        base.holiday_promo    || 0,
+        demand_forecast:      0,
+        holiday_promo:        0,
         restock_count:        base.restock_count    || 1,
         sell_through_rate:    base.qty_in ? parseFloat((simQtySold / base.qty_in).toFixed(4)) : 0,
         wastage_rate:         base.qty_in ? parseFloat(((base.qty_damaged||0) / base.qty_in).toFixed(4)) : 0,
@@ -364,7 +354,6 @@ const PredictController = {
         recommendations,
       });
     } catch (e) {
-      console.error("Simulate error:", e.message);
       res.status(500).json({ error: "Simulation failed", details: e.message });
     }
   },
