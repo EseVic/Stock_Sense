@@ -7,50 +7,183 @@ const { ML_URL }        = require("../config");
 const { applyPredictions } = require("../utils/inventory.utils");
 
 // Map DB record to ML feature names
-function toMLRecord(r) {
-  const qty_in   = r.qty_in   || 0;
-  const qty_sold = r.qty_sold || 0;
-  const qty_dmg  = r.qty_damaged || 0;
-  const shelf_life = r.shelf_life_days || 30;
-  const has_expiry = shelf_life > 0 && !!r.expiry_date;
+// function toMLRecord(r) {
+//   const qty_in   = r.qty_in   || 0;
+//   const qty_sold = r.qty_sold || 0;
+//   const qty_dmg  = r.qty_damaged || 0;
+//   const shelf_life = r.shelf_life_days || 30;
+//   const has_expiry = shelf_life > 0 && !!r.expiry_date;
 
-  let days_to_expiry = r.days_to_expiry || 9999;
-  if (has_expiry && r.expiry_date) {
-    const today = new Date();
-    const exp   = new Date(r.expiry_date);
-    days_to_expiry = Math.max(0, Math.round((exp - today) / (1000 * 60 * 60 * 24)));
+//   let days_to_expiry = r.days_to_expiry || 9999;
+//   if (has_expiry && r.expiry_date) {
+//     const today = new Date();
+//     const exp   = new Date(r.expiry_date);
+//     days_to_expiry = Math.max(0, Math.round((exp - today) / (1000 * 60 * 60 * 24)));
+//   }
+
+//   const restock_days = has_expiry && r.restock_date && r.expiry_date
+//     ? Math.max(1, Math.round((new Date(r.expiry_date) - new Date(r.restock_date)) / (1000 * 60 * 60 * 24)))
+//     : Math.max(shelf_life, 1);
+
+//   const weekly_sales_rate = parseFloat((qty_sold / restock_days * 7).toFixed(4));
+//   const sell_through_rate = qty_in ? parseFloat((qty_sold / qty_in).toFixed(4)) : 0;
+//   const wastage_rate      = qty_in ? parseFloat((qty_dmg  / qty_in).toFixed(4)) : 0;
+//   const shelf_utilisation = has_expiry
+//     ? parseFloat((1 - days_to_expiry / Math.max(shelf_life, 1)).toFixed(4))
+//     : 0;
+
+//   return {
+//     product_name:         r.product_name,
+//     qty_in,
+//     qty_sold,
+//     qty_remaining:        r.qty_remaining || 0,
+//     qty_damaged:          qty_dmg,
+//     shelf_life_days:      shelf_life,
+//     unit_price_ngn:       r.unit_price || 0,
+//     total_revenue_ngn:    (r.unit_price || 0) * qty_sold,
+//     demand_forecast:      r.demand_forecast  || 0,
+//     holiday_promo:        r.holiday_promo    || 0,
+//     restock_count:        r.restock_count    || 1,
+//     sell_through_rate,
+//     wastage_rate,
+//     weekly_sales_rate,
+//     days_to_expiry,
+//     shelf_utilisation,
+//     purchase_frequency:   r.purchase_frequency || 1,
+//     total_units_sold_all: qty_sold,
+//     has_expiry,
+//   };
+// }
+// Map DB record to ML feature names after a sale is recorded.
+// This keeps the expiry information when sending the item to Python.
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// FIX:
+// Compare calendar dates only.
+// This avoids reducing the remaining days because of the current time of day.
+function toUtcDateOnly(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
   }
 
-  const restock_days = has_expiry && r.restock_date && r.expiry_date
-    ? Math.max(1, Math.round((new Date(r.expiry_date) - new Date(r.restock_date)) / (1000 * 60 * 60 * 24)))
-    : Math.max(shelf_life, 1);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+  );
+}
 
-  const weekly_sales_rate = parseFloat((qty_sold / restock_days * 7).toFixed(4));
-  const sell_through_rate = qty_in ? parseFloat((qty_sold / qty_in).toFixed(4)) : 0;
-  const wastage_rate      = qty_in ? parseFloat((qty_dmg  / qty_in).toFixed(4)) : 0;
+function daysBetween(startValue, endValue) {
+  const start = toUtcDateOnly(startValue);
+  const end = toUtcDateOnly(endValue);
+
+  if (start === null || end === null) {
+    return null;
+  }
+
+  return Math.round((end - start) / DAY_MS);
+}
+
+function toMLRecord(r) {
+  const qty_in = r.qty_in || 0;
+  const qty_sold = r.qty_sold || 0;
+  const qty_dmg = r.qty_damaged || 0;
+  const shelf_life = r.shelf_life_days || 30;
+
+  const has_expiry = shelf_life > 0 && !!r.expiry_date;
+
+  // FIX:
+  // Use ?? instead of || so that 0 remains a valid value.
+  let days_to_expiry = r.days_to_expiry ?? 9999;
+
+  if (has_expiry) {
+    const calculatedDays = daysBetween(
+      new Date(),
+      r.expiry_date,
+    );
+
+    if (calculatedDays !== null) {
+      // FIX:
+      // Do not use Math.max(0, ...).
+      // Negative numbers are needed for already expired products.
+      days_to_expiry = calculatedDays;
+    }
+  }
+
+  const calculatedRestockDays =
+    has_expiry &&
+    r.restock_date &&
+    r.expiry_date
+      ? daysBetween(
+          r.restock_date,
+          r.expiry_date,
+        )
+      : null;
+
+  const restock_days =
+    calculatedRestockDays !== null
+      ? Math.max(1, calculatedRestockDays)
+      : Math.max(shelf_life, 1);
+
+  const weekly_sales_rate = parseFloat(
+    ((qty_sold / restock_days) * 7).toFixed(4),
+  );
+
+  const sell_through_rate = qty_in
+    ? parseFloat((qty_sold / qty_in).toFixed(4))
+    : 0;
+
+  const wastage_rate = qty_in
+    ? parseFloat((qty_dmg / qty_in).toFixed(4))
+    : 0;
+
   const shelf_utilisation = has_expiry
-    ? parseFloat((1 - days_to_expiry / Math.max(shelf_life, 1)).toFixed(4))
+    ? parseFloat(
+        (
+          1 -
+          days_to_expiry /
+            Math.max(shelf_life, 1)
+        ).toFixed(4),
+      )
     : 0;
 
   return {
-    product_name:         r.product_name,
+    product_name: r.product_name,
     qty_in,
     qty_sold,
-    qty_remaining:        r.qty_remaining || 0,
-    qty_damaged:          qty_dmg,
-    shelf_life_days:      shelf_life,
-    unit_price_ngn:       r.unit_price || 0,
-    total_revenue_ngn:    (r.unit_price || 0) * qty_sold,
-    demand_forecast:      r.demand_forecast  || 0,
-    holiday_promo:        r.holiday_promo    || 0,
-    restock_count:        r.restock_count    || 1,
+    qty_remaining: r.qty_remaining || 0,
+    qty_damaged: qty_dmg,
+    shelf_life_days: shelf_life,
+    unit_price_ngn: r.unit_price || 0,
+    total_revenue_ngn:
+      (r.unit_price || 0) * qty_sold,
+    demand_forecast:
+      r.demand_forecast || 0,
+    holiday_promo:
+      r.holiday_promo || 0,
+    restock_count:
+      r.restock_count || 1,
     sell_through_rate,
     wastage_rate,
     weekly_sales_rate,
     days_to_expiry,
     shelf_utilisation,
-    purchase_frequency:   r.purchase_frequency || 1,
-    total_units_sold_all: qty_sold,
+    purchase_frequency:
+      r.purchase_frequency || 1,
+    total_units_sold_all:
+      qty_sold,
+
+    // MOST IMPORTANT FIX:
+    // This field was missing before.
+    // Without it, Python returns N/A after logging a sale.
+    expiry_date:
+      r.expiry_date || null,
+
     has_expiry,
   };
 }
