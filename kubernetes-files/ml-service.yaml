@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stocksense-ml-service
+  namespace: stocksense
+  labels:
+    app: stocksense-ml-service
+spec:
+  type: ClusterIP
+  selector:
+    app: stocksense-ml-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 7860
+      targetPort: 7860

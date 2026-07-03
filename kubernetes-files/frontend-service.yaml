@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stocksense-frontend
+  namespace: stocksense
+  labels:
+    app: stocksense-frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: stocksense-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

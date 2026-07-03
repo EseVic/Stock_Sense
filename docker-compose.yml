@@ -1,139 +1,130 @@
-# version: "3.9"
-
 # services:
-
-#   # ── PostgreSQL Database ──────────────────────────────────────────────────────
 #   db:
 #     image: postgres:15-alpine
 #     container_name: stocksense_db
+#     restart: unless-stopped
 #     environment:
-#       POSTGRES_DB:       stocksense
-#       POSTGRES_USER:     postgres
+#       POSTGRES_DB: stocksense
+#       POSTGRES_USER: postgres
 #       POSTGRES_PASSWORD: postgres
-#     volumes:
-#       - pg_data:/var/lib/postgresql/data
 #     ports:
 #       - "5432:5432"
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
 #     healthcheck:
-#       test: ["CMD-SHELL", "pg_isready -U postgres"]
+#       test: ["CMD-SHELL", "pg_isready -U postgres -d stocksense"]
 #       interval: 5s
 #       timeout: 5s
-#       retries: 5
+#       retries: 10
 
-#   # ── ML Service (Flask + scikit-learn) ────────────────────────────────────────
 #   ml-service:
-#     build: ./ml-service
+#     build:
+#       context: ./ml-service
+#       dockerfile: Dockerfile
 #     container_name: stocksense_ml
+#     restart: unless-stopped
 #     ports:
-#       - "5001:5001"
+#       - "5001:7860"
 #     volumes:
 #       - ./ml-service/models:/app/models
 #       - ./ml-service/data:/app/data
-#     environment:
-#       FLASK_ENV: production
-#     restart: unless-stopped
+#     healthcheck:
+#       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/health', timeout=5)\""]
+#       interval: 10s
+#       timeout: 10s
+#       retries: 12
+#       start_period: 30s
 
-#   # ── Backend (Node.js / Express) ───────────────────────────────────────────────
 #   backend:
-#     build: ./backend
+#     build:
+#       context: ./backend
+#       dockerfile: Dockerfile
 #     container_name: stocksense_backend
+#     restart: unless-stopped
 #     ports:
 #       - "3001:3001"
 #     environment:
-#       DB_HOST:     db
-#       DB_PORT:     5432
-#       DB_NAME:     stocksense
-#       DB_USER:     postgres
-#       DB_PASS:     postgres
-#       ML_URL:      http://ml-service:5001
-#       JWT_SECRET:  stocksense_jwt_secret_2026
-#       PORT:        3001
+#       NODE_ENV: production
+#       PORT: 3001
+#       JWT_SECRET: ${JWT_SECRET}
+#       DATABASE_URL: ${DATABASE_URL}
+#       ML_URL: ${ML_URL}
+#       APP_URL: http://localhost:5173
 #     depends_on:
 #       db:
 #         condition: service_healthy
 #       ml-service:
-#         condition: service_started
-#     restart: unless-stopped
+#         condition: service_healthy
+#     healthcheck:
+#       test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+#       interval: 10s
+#       timeout: 10s
+#       retries: 10
+#       start_period: 20s
 
-#   # ── Frontend (React + Vite) ───────────────────────────────────────────────────
 #   frontend:
 #     build:
 #       context: ./frontend
 #       dockerfile: Dockerfile
+#       args:
+#         VITE_API_URL: /
 #     container_name: stocksense_frontend
+#     restart: unless-stopped
 #     ports:
 #       - "5173:80"
 #     depends_on:
-#       - backend
-#     restart: unless-stopped
+#       backend:
+#         condition: service_healthy
+#     healthcheck:
+#       test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/ || exit 1"]
+#       interval: 10s
+#       timeout: 10s
+#       retries: 10
+#       start_period: 10s
 
 # volumes:
-#   pg_data:
+#   postgres_data:
 
 
-version: "3.9"
 
 services:
-  # ── PostgreSQL Database ─────────────────────────────────────────────────────
-  db:
-    image: postgres:15-alpine
-    container_name: stocksense_db
-    environment:
-      POSTGRES_DB: stocksense
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d stocksense"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # ── ML Service ──────────────────────────────────────────────────────────────
-  ml-service:
-    build: ./ml-service
-    container_name: stocksense_ml
-    ports:
-      - "5001:7860"
-    volumes:
-      - ./ml-service/models:/app/models
-      - ./ml-service/data:/app/data
-    restart: unless-stopped
-
-  # ── Backend API ─────────────────────────────────────────────────────────────
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: stocksense_backend
+    restart: unless-stopped
     ports:
       - "3001:3001"
-    environment:
-      NODE_ENV: development
-      PORT: 3001
-      JWT_SECRET: local_stocksense_secret_change_this
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/stocksense
-      ML_URL: http://ml-service:7860
-      APP_URL: http://localhost:5173
-    depends_on:
-      db:
-        condition: service_healthy
-      ml-service:
-        condition: service_started
-    restart: unless-stopped
+    env_file:
+      - ./.env
+    # environment:
+    #   NODE_ENV: ${NODE_ENV}
+    #   PORT: ${PORT}
+    #   APP_URL: http://localhost:5173
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
-  # ── React Frontend ──────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
     container_name: stocksense_frontend
+    restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
-      - backend
-    restart: unless-stopped
-
-volumes:
-  pg_data:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s

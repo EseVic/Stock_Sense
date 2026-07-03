@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stocksense-config
+  namespace: stocksense
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  APP_URL: "http://stocksense-frontend"
+  FRONTEND_URL: "http://stocksense-frontend"
+  ML_URL: "http://stocksense-ml-service:7860"
