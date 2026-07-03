@@ -1,0 +1,304 @@
+pipeline {
+  agent any
+
+  parameters {
+    booleanParam(
+      name: 'DESTROY_INFRA',
+      defaultValue: false,
+      description: '⚠️ Destroy ALL Terraform-managed infrastructure (EKS, VPC, etc.)'
+    )
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    durabilityHint('MAX_SURVIVABILITY')
+  }
+
+  environment {
+    AWS_REGION = 'us-east-1'
+    DOCKERHUB_USERNAME = 'veecode34'
+
+    FRONTEND_IMAGE = 'stocksense-frontend'
+    BACKEND_IMAGE  = 'stocksense-backend'
+    ML_IMAGE       = 'stocksense-ml-service'
+
+    EKS_CLUSTER_NAME = 'my-cluster'
+    K8S_NAMESPACE = 'stocksense'
+
+    TERRAFORM_DIR = 'eks-terraform'
+    K8S_DIR = 'kubernetes-files'
+
+    TF_VAR_admin_principal_arn = 'arn:aws:iam::980805786514:user/EseVic'
+  }
+
+  stages {
+    stage('Checkout Code') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Compute Tag') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        script {
+          def sha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.TAG = "${sha}-${env.BUILD_NUMBER}"
+        }
+      }
+    }
+
+    stage('Terraform Init & Apply') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'AWS_CREEDS']
+        ]) {
+          dir("${TERRAFORM_DIR}") {
+            sh '''
+              set -euo pipefail
+
+              terraform init -reconfigure
+              terraform fmt -check || true
+              terraform validate
+              terraform apply -auto-approve -no-color
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Configure AWS & EKS') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'AWS_CREEDS']
+        ]) {
+          sh '''
+            set -euo pipefail
+
+            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+            kubectl get nodes
+          '''
+        }
+      }
+    }
+
+    stage('Docker Login') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'docker_creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+          )
+        ]) {
+          sh '''
+            set -euo pipefail
+
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+          '''
+        }
+      }
+    }
+
+    stage('Build Docker Images') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        sh '''
+          set -euo pipefail
+
+          docker build -t "$DOCKERHUB_USERNAME/$BACKEND_IMAGE:$TAG" ./backend
+
+          docker build \
+            --build-arg VITE_API_URL=/api \
+            -t "$DOCKERHUB_USERNAME/$FRONTEND_IMAGE:$TAG" \
+            ./frontend
+
+          docker build -t "$DOCKERHUB_USERNAME/$ML_IMAGE:$TAG" ./ml-service
+        '''
+      }
+    }
+
+    stage('Push Docker Images') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        sh '''
+          set -euo pipefail
+
+          docker push "$DOCKERHUB_USERNAME/$BACKEND_IMAGE:$TAG"
+          docker push "$DOCKERHUB_USERNAME/$FRONTEND_IMAGE:$TAG"
+          docker push "$DOCKERHUB_USERNAME/$ML_IMAGE:$TAG"
+        '''
+      }
+    }
+
+    stage('Deploy to EKS') {
+      when {
+        expression { params.DESTROY_INFRA == false }
+      }
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'AWS_CREEDS'],
+          string(credentialsId: 'supabase-postgres-uri', variable: 'DATABASE_URL'),
+          string(credentialsId: 'stocksense-jwt-secret', variable: 'JWT_SECRET')
+        ]) {
+          dir("${K8S_DIR}") {
+            sh '''
+              set -euo pipefail
+
+              aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+              echo "Applying namespace and configmap..."
+              kubectl apply -f namespace.yaml
+              kubectl apply -f configmap.yaml
+
+              echo "Creating Kubernetes secret from Jenkins credentials...
+              kubectl create secret generic stocksense-secret \
+                --namespace "$K8S_NAMESPACE" \
+                --from-literal=DATABASE_URL="$DATABASE_URL" \
+                --from-literal=DB_URL="$DATABASE_URL" \
+                --from-literal=POSTGRES_URI="$DATABASE_URL" \
+                --from-literal=JWT_SECRET="$JWT_SECRET" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              echo "Applying backend..."
+              kubectl apply -f backend-deploy.yaml
+              kubectl apply -f backend-service.yaml
+
+              echo "Applying frontend..."
+              kubectl apply -f frontend-deploy.yaml
+              kubectl apply -f frontend-service.yaml
+
+              echo "Applying ml-service..."
+              kubectl apply -f ml-deploy.yaml
+              kubectl apply -f ml-service.yaml
+
+              echo "Updating backend images..." 
+              kubectl set image deployment/stocksense-backend \
+                stocksense-backend="$DOCKERHUB_USERNAME/$BACKEND_IMAGE:$TAG" \
+                --namespace "$K8S_NAMESPACE"
+
+              echo "Updating frontend image..."
+              kubectl set image deployment/stocksense-frontend \
+                stocksense-frontend="$DOCKERHUB_USERNAME/$FRONTEND_IMAGE:$TAG" \
+                --namespace "$K8S_NAMESPACE"
+
+              echo "Updating ml-service image..."
+              kubectl set image deployment/stocksense-ml-service \
+                stocksense-ml-service="$DOCKERHUB_USERNAME/$ML_IMAGE:$TAG" \
+                --namespace "$K8S_NAMESPACE"
+
+              echo "Applying ingress and HPA..."
+              kubectl apply -f ingress.yaml
+              kubectl apply -f backend-hpa.yaml
+              kubectl apply -f frontend-hpa.yaml
+              kubectl apply -f ml-hpa.yaml
+
+              echo "Waiting for backend rollout..."
+              kubectl rollout status deployment/stocksense-backend \
+                --namespace "$K8S_NAMESPACE" \
+                --timeout=600s
+
+              echo "Waiting for frontend rollout..."
+              kubectl rollout status deployment/stocksense-frontend \
+                --namespace "$K8S_NAMESPACE" \
+                --timeout=600s
+
+              echo "Waiting for ml-service rollout..."
+              kubectl rollout status deployment/stocksense-ml-service \
+                --namespace "$K8S_NAMESPACE" \
+                --timeout=600s
+
+              echo "Deployment completed. Current resources in namespace $K8S_NAMESPACE:"
+              kubectl get pods --namespace "$K8S_NAMESPACE"
+              kubectl get svc --namespace "$K8S_NAMESPACE"
+              kubectl get ingress --namespace "$K8S_NAMESPACE" || true
+              kubectl get hpa --namespace "$K8S_NAMESPACE" || true
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Pre-Destroy: Delete Kubernetes Workloads') {
+      when {
+        expression { params.DESTROY_INFRA == true }
+      }
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'AWS_CREEDS']
+        ]) {
+          sh '''
+            set +e
+
+            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" 2>/dev/null
+
+            kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found=true
+            kubectl wait --for=delete ns/"$K8S_NAMESPACE" --timeout=900s || true
+          '''
+        }
+      }
+    }
+
+    stage('Terraform Destroy') {
+      when {
+        expression { params.DESTROY_INFRA == true }
+      }
+      steps {
+        timeout(time: 60, unit: 'MINUTES') {
+          withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'AWS_CREEDS']
+          ]) {
+            dir("${TERRAFORM_DIR}") {
+              sh '''
+                set -euo pipefail
+
+                terraform init -reconfigure
+
+                for i in 1 2 3; do
+                  echo "===== terraform destroy attempt $i/3 ====="
+                  terraform destroy -auto-approve -no-color && exit 0
+
+                  echo "Destroy attempt $i failed. Sleeping 60 seconds..."
+                  sleep 60
+                done
+
+                echo "Terraform destroy failed after 3 attempts."
+                exit 1
+              '''
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout || true'
+    }
+
+    failure {
+      echo '❌ Pipeline failed!'
+    }
+
+    success {
+      echo '✅ Pipeline completed successfully!'
+    }
+  }
+}
