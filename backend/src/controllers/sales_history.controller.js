@@ -1,3 +1,10 @@
+const axios              = require("axios");
+const { pool, useDB }    = require("../db");
+const { ML_URL }         = require("../config");
+const SalesHistoryModel  = require("../models/sales_history.model");
+const InventoryModel     = require("../models/inventory.model");
+const { applyPredictions } = require("../utils/inventory.utils");
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Compare calendar dates only.
