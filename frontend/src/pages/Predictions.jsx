@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './Predictions.css'
+import { formatDaysToExpiry } from '../utils/expiry'
 
 const RISK_COLOR = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#7D1A1A', '':'#888' }
 const VEL_COLOR  = { Fast:'#1B7A5A', Moderate:'#C47D0E', Slow:'#C0392B', '':'#888' }
@@ -130,7 +131,7 @@ function WhatIfSimulator({ items }) {
               <span className="wc-label">Current values:</span>
               <span className="wc-chip">Sold: {selected.qty_sold}</span>
               <span className="wc-chip">Remaining: {selected.qty_remaining}</span>
-              <span className="wc-chip">Days to expiry: {selected.days_to_expiry < 9999 ? selected.days_to_expiry : '—'}</span>
+              <span className="wc-chip">Days to expiry: {selected.days_to_expiry < 9999 ? formatDaysToExpiry(selected.days_to_expiry) : '—'}</span>
             </div>
 
             <div className="whatif-inputs">
@@ -293,7 +294,7 @@ function PredCard({ item, onPredict }) {
           )}
           <div className="pred-meta">
             <span>Confidence: <strong>{conf}%</strong></span>
-            <span>Days to expiry: <strong>{item.days_to_expiry!=null&&item.days_to_expiry<9999?item.days_to_expiry+'d':'—'}</strong></span>
+            <span>Days to expiry: <strong>{formatDaysToExpiry(item.days_to_expiry)}</strong></span>
             <span>Sell-through: <strong>{item.sell_through_rate!=null?(item.sell_through_rate*100).toFixed(1)+'%':'—'}</strong></span>
             <span>Weekly sales rate: <strong>{item.weekly_sales_rate!=null?Number(item.weekly_sales_rate).toFixed(2)+'/wk':'—'}</strong></span>
           </div>

@@ -1,5 +1,6 @@
 const InventoryModel = require("../models/inventory.model");
 const { useDB }      = require("../db");
+const { buildAlerts } = require("../utils/alerts.utils");
 
 const StatsController = {
   async getStats(req, res) {
@@ -40,15 +41,37 @@ const StatsController = {
       });
 
       // Alerts
-      const alerts = items
-        .filter(i => i.expiry_risk==="High" || i.expiry_risk==="Expired" || i.slow_mover==="Yes")
-        .slice(0,10)
-        .map(i => ({
-          product:  i.product_name,
-          type:     i.expiry_risk==="Expired" ? "Expired" : i.expiry_risk==="High" ? "Expiry Risk" : "Slow Mover",
-          severity: i.expiry_risk==="Expired" ? "critical" : i.expiry_risk==="High" ? "high" : "medium",
-          days:     i.days_to_expiry,
-        }));
+      const alerts = buildAlerts(items);
+
+      // Per-product stock value + risk, for the "all products" treemap on the
+      // dashboard. Value = unit_price × qty_remaining (what's actually still
+      // sitting on the shelf, not total qty_in). Items worth ₦0 are dropped
+      // since a treemap can't size a block with zero value.
+      //
+      // Two things matter here:
+      // 1. expiry_risk is literally the string "N/A" for non-perishables
+      //    (no expiry_date at all), not empty/null — so it needs its own
+      //    explicit "No Expiry" bucket instead of silently falling through.
+      // 2. "size" (what the treemap actually lays out by) is a log scale of
+      //    value, not raw value. Raw ₦ value lets one expensive slow-moving
+      //    product (e.g. a ₦2.8M sack of rice) visually swallow the whole
+      //    chart while cheap-but-expired items (e.g. a ₦7,500 pack of Gala)
+      //    shrink to an invisible sliver — exactly backwards, since the
+      //    cheap expired stuff is usually the more urgent problem. The log
+      //    scale keeps relative size meaningful without letting one product
+      //    dominate. The real ₦ value is kept separately for the label/tooltip.
+      const productMap = items
+        .map(i => {
+          const value = Math.round(parseFloat(i.unit_price||0) * parseInt(i.qty_remaining||0));
+          return {
+            name:     i.product_name,
+            category: i.category,
+            value,
+            size:     value > 0 ? Math.log10(value + 1) : 0,
+            risk:     (i.expiry_risk && i.expiry_risk !== "N/A") ? i.expiry_risk : "No Expiry",
+          };
+        })
+        .filter(p => p.value > 0);
 
       // ── Savings estimate ──────────────────────────────────────────────────
       // Potential loss = value of expired stock still sitting on shelf
@@ -68,7 +91,7 @@ const StatsController = {
 
       res.json({
         total, highRisk, slowMovers, revenue, lowStock,
-        topCategories, byRisk, byVel, alerts,
+        topCategories, byRisk, byVel, alerts, productMap,
         savings: {
           potentialLoss:    Math.round(potentialLoss),
           potentialSavings: Math.round(potentialSavings),

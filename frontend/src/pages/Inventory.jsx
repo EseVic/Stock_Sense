@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import './Inventory.css'
 import { Link } from 'react-router-dom'
+import { formatDaysToExpiry, formatDaysCompact } from '../utils/expiry'
 
 const RISK_BADGE  = { Low:'badge-green', Medium:'badge-amber', High:'badge-red', Expired:'badge-dark', '':'badge-gray' }
 const VEL_BADGE   = { Fast:'badge-green', Moderate:'badge-amber', Slow:'badge-red', '':'badge-gray' }
@@ -18,12 +19,13 @@ function Badge({ label, type='risk' }) {
 }
 
 function exportCSV(items) {
-  const headers = ['Product','Category','Qty In','Qty Sold','Qty Remaining','Unit Price (₦)','Days to Expiry','Expiry Risk','Sales Velocity','Customer Preference','Slow Mover']
+  const headers = ['Product','Category','Qty In','Qty Sold','Qty Remaining','Unit Price (₦)','Expiry Risk','Days to Expiry','Sales Velocity','Customer Preference','Slow Mover']
   const rows = items.map(i => [
     i.product_name, i.category, i.qty_in, i.qty_sold, i.qty_remaining,
     i.unit_price,
-    i.days_to_expiry < 9999 ? i.days_to_expiry : '—',
-    i.expiry_risk ?? '', i.sales_velocity ?? '', i.customer_preference ?? '', i.slow_mover ?? ''
+    i.expiry_risk ?? '',
+    i.days_to_expiry < 9999 ? formatDaysCompact(i.days_to_expiry) : '—',
+    i.sales_velocity ?? '', i.customer_preference ?? '', i.slow_mover ?? ''
   ])
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type:'text/csv' })
@@ -39,8 +41,9 @@ function printTable(items) {
       <td>${i.product_name}</td><td>${i.category}</td>
       <td>${i.qty_in}</td><td>${i.qty_sold}</td><td>${i.qty_remaining}</td>
       <td>₦${Number(i.unit_price||0).toLocaleString()}</td>
-      <td>${i.days_to_expiry != null && i.days_to_expiry < 9999 ? i.days_to_expiry+'d' : '—'}</td>
-      <td>${i.expiry_risk ?? '—'}</td><td>${i.sales_velocity ?? '—'}</td>
+      <td>${i.expiry_risk ?? '—'}</td>
+      <td>${i.days_to_expiry != null && i.days_to_expiry < 9999 ? formatDaysCompact(i.days_to_expiry) : '—'}</td>
+      <td>${i.sales_velocity ?? '—'}</td>
       <td>${i.customer_preference ?? '—'}</td><td>${i.slow_mover ?? '—'}</td>
     </tr>`).join('')
   const html = `
@@ -60,8 +63,8 @@ function printTable(items) {
       <table>
         <thead><tr>
           <th>Product</th><th>Category</th><th>Qty In</th><th>Sold</th>
-          <th>Remaining</th><th>Price</th><th>Days to Expiry</th>
-          <th>Expiry Risk</th><th>Sales Speed</th><th>Preference</th><th>Slow Mover</th>
+          <th>Remaining</th><th>Price</th>
+          <th>Expiry Risk</th><th>Days to Expiry</th><th>Sales Speed</th><th>Preference</th><th>Slow Mover</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -275,8 +278,8 @@ export default function Inventory() {
               <thead>
                 <tr>
                   <th>#</th><th>Product</th><th>Category</th><th>Qty in</th><th>Sold</th>
-                  <th>Remaining</th><th>Price</th><th>Days to expiry</th>
-                  <th>Expiry risk</th><th>Sales speed</th><th>Preference</th>
+                  <th>Remaining</th><th>Price</th>
+                  <th>Expiry risk</th><th>Days to expiry</th><th>Sales speed</th><th>Preference</th>
                   <th>Slow mover</th><th>Actions</th>
                 </tr>
               </thead>
@@ -298,10 +301,10 @@ export default function Inventory() {
                     <td>{item.qty_sold}</td>
                     <td className={item.qty_remaining <= 5 ? 'td-urgent' : ''}>{item.qty_remaining}</td>
                     <td>₦{Number(item.unit_price || 0).toLocaleString()}</td>
-                    <td className={item.days_to_expiry <= 7 && item.days_to_expiry < 9999 ? 'td-urgent' : ''}>
-                      {item.days_to_expiry != null && item.days_to_expiry < 9999 ? item.days_to_expiry + 'd' : '—'}
-                    </td>
                     <td><Badge label={item.expiry_risk} type="risk" /></td>
+                    <td className={item.days_to_expiry <= 7 && item.days_to_expiry < 9999 ? 'td-urgent' : ''}>
+                      {formatDaysCompact(item.days_to_expiry)}
+                    </td>
                     <td><Badge label={item.sales_velocity} type="vel" /></td>
                     <td><Badge label={item.customer_preference} type="pref" /></td>
                     <td><Badge label={item.slow_mover} type="pref" /></td>

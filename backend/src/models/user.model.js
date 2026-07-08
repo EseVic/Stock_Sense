@@ -22,6 +22,20 @@ const UserModel = {
     return { id: u.id, name: u.name, email: u.email, store_name: u.store_name, city: u.city, is_verified: u.is_verified };
   },
 
+  // Used by the daily alert digest job to loop over every account.
+  // Only verified users are notified, since unverified accounts haven't confirmed a real inbox.
+  async findAllUsers(useDB) {
+    if (useDB) {
+      const r = await pool.query(
+        "SELECT id, name, email, store_name, city FROM users WHERE is_verified=true"
+      );
+      return r.rows;
+    }
+    return memStore.users
+      .filter((u) => u.is_verified)
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, store_name: u.store_name, city: u.city }));
+  },
+
   async create({ name, email, password, store_name, city, verify_token, verify_expires }, useDB) {
     if (useDB) {
       const r = await pool.query(

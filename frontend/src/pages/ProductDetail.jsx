@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import './ProductDetail.css'
+import { formatDaysToExpiry } from '../utils/expiry'
 
 const RISK_COLOR = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#7D1A1A' }
 const VEL_COLOR  = { Fast:'#1B7A5A', Moderate:'#C47D0E', Slow:'#C0392B' }
@@ -165,7 +166,7 @@ export default function ProductDetail() {
                   <td>{b.qty_in}</td>
                   <td>{b.qty_sold}</td>
                   <td className={b.qty_remaining<=5?'td-urgent':''}>{b.qty_remaining}</td>
-                  <td className={b.days_to_expiry<=7?'td-urgent':''}>{b.days_to_expiry!=null?b.days_to_expiry+'d':'—'}</td>
+                  <td className={b.days_to_expiry<=7?'td-urgent':''}>{formatDaysToExpiry(b.days_to_expiry)}</td>
                   <td>{b.sell_through_rate!=null?Math.round(b.sell_through_rate*100)+'%':'—'}</td>
                   <td>
                     {b.expiry_risk

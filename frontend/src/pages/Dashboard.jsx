@@ -1,11 +1,55 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Treemap } from 'recharts'
 import './Dashboard.css'
+import { formatDaysToExpiryShort } from '../utils/expiry'
 
-const RISK_COLORS = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#4A1A1A' }
+// Builds the second line of an alert card. If the item is already past its
+// expiry date, the day count itself says "Expired Xd ago" which is the most
+// concrete, actionable fact — so it's shown alone rather than paired with a
+// possibly-stale ML risk label like "Expiry Risk". If there's no real expiry
+// date at all (slow movers with no expiry_date), the day count is omitted
+// entirely instead of showing the meaningless 9999 sentinel.
+function alertDetailText(a) {
+  const label = formatDaysToExpiryShort(a.days)
+  if (!label) return a.type
+  if (a.days < 0) return label
+  return `${a.type} — ${label}`
+}
+
+const RISK_COLORS = { Low:'#1B7A5A', Medium:'#C47D0E', High:'#C0392B', Expired:'#4A1A1A', 'No Expiry':'#8B93A1' }
 const VEL_COLORS  = { Slow:'#C0392B', Moderate:'#C47D0E', Fast:'#1B7A5A' }
+
+// Every product as one block, colored by expiry risk. Block AREA is driven by
+// a log-scaled "size" field (see stats.controller.js) rather than raw ₦ value,
+// so a handful of expensive slow movers can't visually bury the cheap-but-
+// urgent expired items — but the LABEL still shows the real ₦ value from
+// payload.value, since that's what's actually useful to read.
+function ProductTreemapCell(props) {
+  const { x, y, width, height, name } = props
+  const risk = props.risk ?? props.payload?.risk ?? 'No Expiry'
+  const value = props.payload?.value ?? props.value
+  const fill = RISK_COLORS[risk] || '#8B93A1'
+  if (width < 2 || height < 2) return null
+  const showLabel = width > 55 && height > 28
+  const maxChars = Math.max(1, Math.floor((width - 12) / 6.5))
+  const label = name && name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name
+
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#fff" strokeWidth={1.5} rx={3} />
+      {showLabel && (
+        <>
+          <text x={x + 6} y={y + 16} fontSize={11} fontWeight={600} fill="#fff">{label}</text>
+          <text x={x + 6} y={y + 30} fontSize={10} fill="#fff" opacity={0.85}>
+            ₦{Number(value).toLocaleString()}
+          </text>
+        </>
+      )}
+    </g>
+  )
+}
 
 function StatCard({ label, value, sub, color='var(--green)', icon }) {
   return (
@@ -137,8 +181,38 @@ export default function Dashboard() {
                 <div className="alert-dot" />
                 <div>
                   <div className="alert-prod">{a.product}</div>
-                  <div className="alert-detail">{a.type}{a.days != null ? ` — ${a.days} days to expiry` : ''}</div>
+                  <div className="alert-detail">{alertDetailText(a)}</div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stats.productMap?.length > 0 && (
+        <div className="chart-card" style={{ marginBottom:14 }}>
+          <h3 className="chart-title">All products — value & expiry risk</h3>
+          <ResponsiveContainer width="100%" height={320}>
+            <Treemap
+              data={stats.productMap}
+              dataKey="size"
+              nameKey="name"
+              stroke="#fff"
+              isAnimationActive={false}
+              content={<ProductTreemapCell />}
+            >
+              <Tooltip
+                formatter={(_value, _name, props) =>
+                  [`₦${Number(props.payload.value).toLocaleString()} · ${props.payload.risk} risk`, props.payload.name]
+                }
+              />
+            </Treemap>
+          </ResponsiveContainer>
+          <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginTop:10, fontSize:12 }}>
+            {Object.entries(RISK_COLORS).map(([label, color]) => (
+              <div key={label} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ width:10, height:10, borderRadius:2, background:color, display:'inline-block' }} />
+                {label}
               </div>
             ))}
           </div>
