@@ -75,7 +75,8 @@
 
 /* ════ DARK MODE ════ */
 html.app-dark .supp-table-wrap,
-html.app-dark .supp-card { background:#161b22 !important; }
+html.app-dark .sup-card { background:#161b22 !important; }
+html.app-dark .sup-name { color:#e6edf3 !important; }
 html.app-dark .supp-table th { background:#21262d !important; color:#8b949e !important; border-bottom-color:#30363d !important; }
 html.app-dark .supp-table td { color:#e6edf3 !important; border-bottom-color:#30363d !important; }
 html.app-dark .supp-table tr:hover td { background:rgba(255,255,255,.03) !important; }
