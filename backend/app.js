@@ -9,6 +9,7 @@ const mlRoutes            = require("./src/routes/ml.routes");
 const supplierRoutes      = require("./src/routes/supplier.routes");
 const purchaseOrderRoutes = require("./src/routes/purchase_order.routes");
 const salesHistoryRoutes  = require("./src/routes/sales_history.routes");
+const alertsRoutes        = require("./src/routes/alerts.routes");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use("/api",                mlRoutes);
 app.use("/api/suppliers",      supplierRoutes);
 app.use("/api/purchase-orders",purchaseOrderRoutes);
 app.use("/api/sales-history",  salesHistoryRoutes);
+app.use("/api",                alertsRoutes);
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {

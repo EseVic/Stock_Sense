@@ -207,4 +207,5 @@ function applyPredictions(preds = {}) {
 module.exports = {
   buildPayload,
   applyPredictions,
+  calculateDaysToExpiry,
 };

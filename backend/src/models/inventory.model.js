@@ -1,4 +1,18 @@
 const { pool, memStore } = require("../db");
+const { calculateDaysToExpiry } = require("../utils/inventory.utils");
+
+//  Recomputing days to expire here so that the value is always up-to-date 
+// when the user fetches inventory items. This is important because
+// every read means it counts down on its own as real calendar days pass.
+function withLiveExpiry(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    days_to_expiry: row.expiry_date
+      ? calculateDaysToExpiry(row.expiry_date)
+      : 9999,
+  };
+}
 
 const InventoryModel = {
   async findAll({ userId, search, risk, page, limit }, useDB) {
@@ -16,14 +30,14 @@ const InventoryModel = {
         pool.query(q, params),
         pool.query("SELECT COUNT(*) FROM inventory WHERE user_id=$1", [userId]),
       ]);
-      return { items: rows.rows, total: parseInt(count.rows[0].count) };
+      return { items: rows.rows.map(withLiveExpiry), total: parseInt(count.rows[0].count) };
     }
 
     let items = memStore.inventory.filter((i) => i.user_id === userId);
     if (search) items = items.filter((i) => i.product_name.toLowerCase().includes(search.toLowerCase()));
     if (risk)   items = items.filter((i) => i.expiry_risk === risk);
     const total = items.length;
-    return { items: items.slice(offset, offset + limit), total };
+    return { items: items.slice(offset, offset + limit).map(withLiveExpiry), total };
   },
 
   async findByIds({ userId, ids }, useDB) {
@@ -32,11 +46,11 @@ const InventoryModel = {
         `SELECT * FROM inventory WHERE user_id=$1 ${ids?.length ? "AND id=ANY($2)" : ""}`,
         ids?.length ? [userId, ids] : [userId]
       );
-      return r.rows;
+      return r.rows.map(withLiveExpiry);
     }
-    return memStore.inventory.filter(
-      (i) => i.user_id === userId && (!ids?.length || ids.includes(i.id))
-    );
+    return memStore.inventory
+      .filter((i) => i.user_id === userId && (!ids?.length || ids.includes(i.id)))
+      .map(withLiveExpiry);
   },
 
   async create(payload, useDB) {
@@ -89,9 +103,9 @@ const InventoryModel = {
   async findAllForUser(userId, useDB) {
     if (useDB) {
       const r = await pool.query("SELECT * FROM inventory WHERE user_id=$1", [userId]);
-      return r.rows;
+      return r.rows.map(withLiveExpiry);
     }
-    return memStore.inventory.filter((i) => i.user_id === userId);
+    return memStore.inventory.filter((i) => i.user_id === userId).map(withLiveExpiry);
   },
 };
 

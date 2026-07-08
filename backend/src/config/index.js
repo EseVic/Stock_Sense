@@ -4,6 +4,7 @@ module.exports = {
   port: process.env.PORT || 3001,
   JWT_SECRET: process.env.JWT_SECRET,  
   ML_URL:     process.env.ML_URL,      
+  CRON_SECRET: process.env.CRON_SECRET,
 
   db: process.env.DATABASE_URL
     ? {
