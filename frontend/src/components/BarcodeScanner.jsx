@@ -12,8 +12,9 @@ export default function BarcodeScanner({ onScan, onClose }) {
 
   useEffect(() => {
     if (mode !== 'camera') return
-    startCamera()
-    return () => stopAll()
+    let cancelled = false
+    startCamera(() => cancelled)
+    return () => { cancelled = true; stopAll() }
   }, [mode])
 
   const stopAll = () => {
@@ -23,15 +24,29 @@ export default function BarcodeScanner({ onScan, onClose }) {
     setScanning(false)
   }
 
-  const startCamera = async () => {
+  const startCamera = async (isCancelled) => {
     setError('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       })
+
+      if (isCancelled() || !videoRef.current) {
+        stream.getTracks().forEach(t => t.stop())
+        return
+      }
+
       streamRef.current = stream
       videoRef.current.srcObject = stream
-      await videoRef.current.play()
+
+      try {
+        await videoRef.current.play()
+      } catch (playErr) {
+        if (isCancelled() || playErr.name === 'AbortError') return
+        throw playErr
+      }
+
+      if (isCancelled()) return
       setScanning(true)
 
       // Try native BarcodeDetector first (Android Chrome)
@@ -62,6 +77,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
         })
       }
     } catch(err) {
+      if (isCancelled()) return
       setError('Could not access camera: ' + err.message)
       setMode('nocamera')
     }

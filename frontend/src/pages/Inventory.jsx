@@ -5,6 +5,14 @@ import { Link } from 'react-router-dom'
 import { formatDaysToExpiry, formatDaysCompact } from '../utils/expiry'
 
 const RISK_BADGE  = { Low:'badge-green', Medium:'badge-amber', High:'badge-red', Expired:'badge-dark', '':'badge-gray' }
+
+// Calculate stock status in one place to avoid inconsistent results.
+function stockStatus(item) {
+  if (item.qty_remaining == null || !item.qty_in) return null
+  if (item.qty_remaining === 0) return 'out'
+  if ((item.qty_remaining / item.qty_in) <= 0.20) return 'low'
+  return null
+}
 const VEL_BADGE   = { Fast:'badge-green', Moderate:'badge-amber', Slow:'badge-red', '':'badge-gray' }
 const PREF_BADGE  = { High:'badge-green', Medium:'badge-amber', Low:'badge-gray' }
 
@@ -195,8 +203,7 @@ export default function Inventory() {
       setItems(page_r.data.items); setTotal(page_r.data.total)
       const all = all_r.data.items || []
       setAll(all)
-      setLow(all.filter(i => i.qty_remaining != null && i.qty_in > 0 &&
-        (i.qty_remaining <= 5 || (i.qty_remaining / i.qty_in) <= 0.1)))
+      setLow(all.filter(i => stockStatus(i) !== null))
     } catch(e) { console.error(e) }
     finally    { setLoading(false) }
   }
@@ -231,7 +238,7 @@ export default function Inventory() {
         <div className="inv-actions">
           {lowStock.length > 0 && (
             <button className="low-stock-btn" onClick={() => setShowLow(s => !s)}>
-              ⚠️ {lowStock.length} low stock
+              ⚠️ {lowStock.length} low/out of stock
             </button>
           )}
           <button className="icon-btn" onClick={() => exportCSV(allItems)} title="Export to CSV">⬇ CSV</button>
@@ -245,13 +252,18 @@ export default function Inventory() {
       {showLow && lowStock.length > 0 && (
         <div className="low-stock-panel">
           <div className="lsp-header">
-            <span>⚠️ Low stock alerts — {lowStock.length} products need restocking</span>
+            <span>⚠️ Stock alerts — {lowStock.length} product{lowStock.length===1?'':'s'} low or out of stock</span>
             <button className="lsp-close" onClick={() => setShowLow(false)}>✕</button>
           </div>
           <div className="lsp-list">
             {lowStock.map((i, idx) => (
               <div key={idx} className="lsp-item">
-                <div className="lsp-name">{i.product_name}</div>
+                <div className="lsp-name">
+                  {i.product_name}
+                  <span className={stockStatus(i) === 'out' ? 'oos-badge' : 'low-badge'} style={{marginLeft:8}}>
+                    {stockStatus(i) === 'out' ? 'Out of stock' : 'Low stock'}
+                  </span>
+                </div>
                 <div className="lsp-detail">
                   {i.qty_remaining} units remaining of {i.qty_in} —
                   <span className="lsp-pct"> {Math.round((i.qty_remaining / i.qty_in) * 100)}% left</span>
@@ -288,22 +300,25 @@ export default function Inventory() {
                   <tr><td colSpan={13} style={{ textAlign: 'center', color: 'var(--gray)', padding: '32px' }}>No records found</td></tr>
                 )}
                 {items.map((item, idx) => (
-                  <tr key={item.id} className={item.qty_remaining <= 5 ? 'tr-low' : ''}>
+                  <tr key={item.id} className={stockStatus(item) ? 'tr-low' : ''}>
                     <td style={{ color: 'var(--gray)', fontSize: 12, minWidth: 32 }}>{(page - 1) * LIMIT + idx + 1}</td>
                     <td className="td-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Link to={`/app/inventory/${encodeURIComponent(item.product_name)}`} className="prod-link" title="View product detail">
                         {item.product_name}
                       </Link>
-                      {item.qty_remaining <= 5 && <span className="low-badge">Low</span>}
+                      {stockStatus(item) === 'out' && <span className="oos-badge">Out of stock</span>}
+                      {stockStatus(item) === 'low' && <span className="low-badge">Low</span>}
                     </td>
                     <td className="td-cat">{item.category}</td>
                     <td>{item.qty_in}</td>
                     <td>{item.qty_sold}</td>
-                    <td className={item.qty_remaining <= 5 ? 'td-urgent' : ''}>{item.qty_remaining}</td>
+                    <td className={stockStatus(item) ? 'td-urgent' : ''}>{item.qty_remaining}</td>
                     <td>₦{Number(item.unit_price || 0).toLocaleString()}</td>
                     <td><Badge label={item.expiry_risk} type="risk" /></td>
                     <td className={item.days_to_expiry <= 7 && item.days_to_expiry < 9999 ? 'td-urgent' : ''}>
-                      {formatDaysCompact(item.days_to_expiry)}
+                      <span className={`badge ${RISK_BADGE[item.expiry_risk] || 'badge-gray'}`}>
+                        {formatDaysCompact(item.days_to_expiry)}
+                      </span>
                     </td>
                     <td><Badge label={item.sales_velocity} type="vel" /></td>
                     <td><Badge label={item.customer_preference} type="pref" /></td>

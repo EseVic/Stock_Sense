@@ -9,7 +9,7 @@ const SalesHistoryModel = {
       if (product) { q += ` AND product_name ILIKE $${params.length + 1}`; params.push(`%${product}%`); }
       if (from)    { q += ` AND sale_date >= $${params.length + 1}`; params.push(from); }
       if (to)      { q += ` AND sale_date <= $${params.length + 1}`; params.push(to); }
-      q += ` ORDER BY sale_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      q += ` ORDER BY sale_date DESC, created_at DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
       const [rows, count] = await Promise.all([
@@ -20,6 +20,11 @@ const SalesHistoryModel = {
     }
     let items = (memStore.salesHistory || []).filter((s) => s.user_id === userId);
     if (product) items = items.filter((s) => s.product_name.toLowerCase().includes(product.toLowerCase()));
+    items = items.sort((a, b) => {
+      const dateDiff = new Date(b.sale_date) - new Date(a.sale_date);
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
     return { items: items.slice(offset, offset + limit), total: items.length };
   },
 
