@@ -22,7 +22,7 @@ const InventoryController = {
     try {
       const records   = Array.isArray(req.body) ? req.body : [req.body];
 
-        // Validate stock totals before saving to prevent negative inventory.
+      // Ensure sold and damaged quantities don't exceed available stock.
       for (const rec of records) {
         const qty_in  = parseInt(rec.qty_in, 10)      || 0;
         const qty_sold = parseInt(rec.qty_sold, 10)     || 0;
@@ -58,6 +58,58 @@ const InventoryController = {
       }
 
       res.json({ saved: processed.length, items: processed });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  },
+
+// Restock an existing inventory record and optionally update its expiry date.
+  async restock(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      const { qty_added, expiry_date } = req.body;
+
+      const qtyAddedInt = parseInt(qty_added, 10);
+      if (!Number.isInteger(qtyAddedInt) || qtyAddedInt <= 0) {
+        return res.status(400).json({ error: "Qty added must be a whole number greater than 0" });
+      }
+
+      if (useDB) {
+        const existingR = await pool.query(
+          `SELECT * FROM inventory WHERE id=$1 AND user_id=$2`,
+          [parseInt(id), userId]
+        );
+        if (!existingR.rows.length) return res.status(404).json({ error: "Item not found" });
+        const existing = existingR.rows[0];
+
+        const newQtyIn = existing.qty_in + qtyAddedInt;
+        const newRemaining = newQtyIn - existing.qty_sold - existing.qty_damaged + existing.qty_adjusted;
+
+        const r = await pool.query(
+          `UPDATE inventory
+           SET qty_in=$1, qty_remaining=$2, expiry_date=COALESCE($3, expiry_date)
+           WHERE id=$4 AND user_id=$5
+           RETURNING *`,
+          [newQtyIn, newRemaining, expiry_date || null, parseInt(id), userId]
+        );
+        return res.json(r.rows[0]);
+      } else {
+        const { memStore } = require("../db");
+        const idx = memStore.inventory.findIndex(i => i.id === parseInt(id) && i.user_id === userId);
+        if (idx < 0) return res.status(404).json({ error: "Item not found" });
+
+        const existing = memStore.inventory[idx];
+        const newQtyIn = existing.qty_in + qtyAddedInt;
+        const newRemaining = newQtyIn - existing.qty_sold - existing.qty_damaged + existing.qty_adjusted;
+
+        Object.assign(memStore.inventory[idx], {
+          qty_in: newQtyIn,
+          qty_remaining: newRemaining,
+          expiry_date: expiry_date || existing.expiry_date,
+        });
+        return res.json(memStore.inventory[idx]);
+      }
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

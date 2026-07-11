@@ -38,7 +38,7 @@ export default function ProductDetail() {
     <div className="pd-empty">
       <div style={{fontSize:48}}>📦</div>
       <h2>Product not found</h2>
-      <Link to="/inventory" className="pd-back-btn">← Back to inventory</Link>
+      <Link to="/app/inventory" className="pd-back-btn">← Back to inventory</Link>
     </div>
   )
 
@@ -126,7 +126,7 @@ export default function ProductDetail() {
                 : ' Stock levels are currently healthy.'}
             </div>
           </div>
-          <Link to="/add-stock" className="restock-btn">+ Add stock</Link>
+          <Link to="/app/add-stock" className="restock-btn">+ Add stock</Link>
         </div>
       )}
 
