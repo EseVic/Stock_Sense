@@ -161,6 +161,27 @@ const SalesHistoryController = {
       if (!product_name || !qty_sold) return res.status(400).json({ error: "Product name and qty_sold are required" });
 
       const qtySoldInt = parseInt(qty_sold);
+      if (!Number.isInteger(qtySoldInt) || qtySoldInt <= 0) {
+        return res.status(400).json({ error: "Qty sold must be a whole number greater than 0" });
+      }
+
+      // Validate stock before updating inventory to prevent overselling.
+      let matchedInventory = null;
+      if (inventory_id) {
+        const recs = await InventoryModel.findByIds({ userId: req.user.id, ids: [inventory_id] }, useDB);
+        matchedInventory = recs[0] || null;
+      } else {
+        const allItems = await InventoryModel.findAllForUser(req.user.id, useDB);
+        matchedInventory = allItems
+          .filter(i => i.product_name.toLowerCase() === product_name.toLowerCase())
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null;
+      }
+
+      if (matchedInventory && qtySoldInt > matchedInventory.qty_remaining) {
+        return res.status(400).json({
+          error: `Cannot log ${qtySoldInt} sold — only ${matchedInventory.qty_remaining} unit(s) of "${matchedInventory.product_name}" remaining in stock.`,
+        });
+      }
 
       const item = await SalesHistoryModel.create(
         {

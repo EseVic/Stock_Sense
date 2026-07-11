@@ -1,16 +1,26 @@
 const { pool, memStore } = require("../db");
 const { calculateDaysToExpiry } = require("../utils/inventory.utils");
 
-//  Recomputing days to expire here so that the value is always up-to-date 
-// when the user fetches inventory items. This is important because
-// every read means it counts down on its own as real calendar days pass.
+// Calculate days_to_expiry and expiry_risk values dynamically
+// on every request to keep them up to date  instead of using stored values.
+// 
+function liveExpiryRisk(days) {
+  if (days >= 9999) return "N/A";
+  if (days < 0) return "Expired";
+  if (days <= 7) return "High";
+  if (days <= 30) return "Medium";
+  return "Low";
+}
+
 function withLiveExpiry(row) {
   if (!row) return row;
+  const days_to_expiry = row.expiry_date
+    ? calculateDaysToExpiry(row.expiry_date)
+    : 9999;
   return {
     ...row,
-    days_to_expiry: row.expiry_date
-      ? calculateDaysToExpiry(row.expiry_date)
-      : 9999,
+    days_to_expiry,
+    expiry_risk: liveExpiryRisk(days_to_expiry),
   };
 }
 

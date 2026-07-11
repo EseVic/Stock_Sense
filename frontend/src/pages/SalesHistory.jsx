@@ -9,7 +9,7 @@ const CATEGORIES = ['Grains & Cereals','Pasta & Noodles','Cooking Oils & Fats','
   'Personal Care','Baby & Infant','Household Essentials','Other']
 const CITIES = ['Lagos','Abuja','Kano','Port Harcourt','Ibadan','Benin City','Kaduna','Aba','Enugu','Onitsha','Warri','Ilorin','Jos','Owerri','Uyo']
 
-const EMPTY_FORM = { product_name:'', category:'Other', store_city:'Lagos', qty_sold:'', unit_price:'', sale_date:'', notes:'', inventory_id:'' }
+const EMPTY_FORM = { product_name:'', category:'Other', category_other:'', store_city:'Lagos', qty_sold:'', unit_price:'', sale_date:'', notes:'', inventory_id:'' }
 
 function StatCard({ label, value, color='var(--green)', icon }) {
   return (
@@ -36,6 +36,8 @@ export default function SalesHistory() {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [invItems,    setInvItems]    = useState([])
+  const [invSearch,   setInvSearch]   = useState('')
+  const [showInvSuggestions, setShowInvSuggestions] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const LIMIT = 30
 
@@ -55,16 +57,14 @@ export default function SalesHistory() {
   useEffect(() => { loadAll() }, [page, search, days])
 
   const openModal = async () => {
-    setForm(EMPTY_FORM); setError(''); setModal(true)
+    setForm(EMPTY_FORM); setError(''); setModal(true); setInvSearch('')
     try {
       const r = await axios.get('/api/inventory', { params: { limit: 200 } })
       setInvItems(r.data.items || [])
     } catch(e) { setInvItems([]) }
   }
 
-  const handleInvSelect = (e) => {
-    const id = e.target.value
-    const inv = invItems.find(i => String(i.id) === String(id))
+  const selectInvItem = (inv) => {
     if (inv) {
       setForm(f => ({
         ...f,
@@ -74,9 +74,16 @@ export default function SalesHistory() {
         store_city:    inv.store_city || f.store_city,
         unit_price:    inv.unit_price || f.unit_price,
       }))
+      setInvSearch(inv.product_name)
     } else {
       setForm(f => ({ ...f, inventory_id: '' }))
     }
+    setShowInvSuggestions(false)
+  }
+
+  const handleInvSelect = (e) => {
+    const id = e.target.value
+    selectInvItem(invItems.find(i => String(i.id) === String(id)))
   }
 
   const handleScan = (code) => {
@@ -90,7 +97,26 @@ export default function SalesHistory() {
     if (!form.product_name || !form.qty_sold) return setError('Product name and quantity sold are required')
     setSaving(true); setError('')
     try {
-      await axios.post('/api/sales-history', form)
+      // Last-chance exact-match resolve, in case blur didn't fire before this
+      // was called (e.g. clicking "Log sale" while the search field still
+      // had focus) — same category-defaults-to-Other bug otherwise.
+      let effectiveForm = form
+      if (!form.inventory_id && form.product_name) {
+        const exactMatch = invItems.find(i => i.product_name.toLowerCase() === form.product_name.toLowerCase())
+        if (exactMatch) {
+          effectiveForm = {
+            ...form,
+            inventory_id: exactMatch.id,
+            category:     exactMatch.category   || form.category,
+            store_city:   exactMatch.store_city || form.store_city,
+            unit_price:   exactMatch.unit_price || form.unit_price,
+          }
+        }
+      }
+      const finalCategory = (effectiveForm.category === 'Other' && effectiveForm.category_other?.trim()) ? effectiveForm.category_other.trim() : effectiveForm.category
+      const payload = { ...effectiveForm, category: finalCategory }
+      delete payload.category_other
+      await axios.post('/api/sales-history', payload)
       setModal(false); setForm(EMPTY_FORM); loadAll()
     } catch(e) { setError(e.response?.data?.error || 'Failed to log sale') }
     finally    { setSaving(false) }
@@ -234,16 +260,38 @@ export default function SalesHistory() {
           <div className="modal-box">
             <h2 className="modal-title">Log a sale</h2>
             <div className="modal-grid">
-              <div className="modal-full">
+              <div className="modal-full" style={{position:'relative'}}>
                 <label className="field-label">Link to inventory item <span style={{color:'var(--gray)',fontWeight:400}}>(auto-fills & syncs stock)</span></label>
-                <select className="field-input" value={form.inventory_id} onChange={handleInvSelect}>
-                  <option value="">— Select inventory item (or type manually below) —</option>
-                  {invItems.map(i => (
-                    <option key={i.id} value={i.id}>
-                      #{i.id} · {i.product_name} · {i.qty_remaining ?? 0} remaining
-                    </option>
-                  ))}
-                </select>
+                <input
+                  className="field-input"
+                  value={invSearch}
+                  onChange={e => { setInvSearch(e.target.value); setShowInvSuggestions(true); if (!e.target.value) selectInvItem(null) }}
+                  onFocus={() => setShowInvSuggestions(true)}
+                  onBlur={() => setTimeout(() => {
+                    setShowInvSuggestions(false)
+                    if (!form.inventory_id && invSearch) {
+                      const exactMatch = invItems.find(i => i.product_name.toLowerCase() === invSearch.toLowerCase())
+                      if (exactMatch) selectInvItem(exactMatch)
+                    }
+                  }, 150)}
+                  placeholder="Search products… (or type a new product name below)"
+                  autoComplete="off"
+                />
+                {showInvSuggestions && (
+                  <div className="inv-suggestions">
+                    {invItems.filter(i => i.product_name.toLowerCase().includes(invSearch.toLowerCase())).length === 0 && (
+                      <div className="inv-suggestion-empty">No matching inventory item — you can still type the product name manually below</div>
+                    )}
+                    {invItems
+                      .filter(i => i.product_name.toLowerCase().includes(invSearch.toLowerCase()))
+                      .map(i => (
+                        <div key={i.id} className="inv-suggestion-item" onMouseDown={() => selectInvItem(i)}>
+                          <strong>{i.product_name}</strong>
+                          <span>#{i.id} · {i.qty_remaining ?? 0} remaining</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
               <div className="modal-full">
                 <label className="field-label">Product name *</label>
@@ -260,6 +308,15 @@ export default function SalesHistory() {
                 <select className="field-input" value={form.category} onChange={set('category')}>
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
+                {form.category === 'Other' && (
+                  <input
+                    className="field-input"
+                    style={{marginTop:8}}
+                    value={form.category_other}
+                    onChange={set('category_other')}
+                    placeholder="Type the category name"
+                  />
+                )}
               </div>
               <div>
                 <label className="field-label">Store city</label>

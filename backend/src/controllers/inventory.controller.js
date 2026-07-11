@@ -21,6 +21,21 @@ const InventoryController = {
   async create(req, res) {
     try {
       const records   = Array.isArray(req.body) ? req.body : [req.body];
+
+        // Validate stock totals before saving to prevent negative inventory.
+      for (const rec of records) {
+        const qty_in  = parseInt(rec.qty_in, 10)      || 0;
+        const qty_sold = parseInt(rec.qty_sold, 10)     || 0;
+        const qty_dmg  = parseInt(rec.qty_damaged, 10)  || 0;
+        const qty_adj  = parseInt(rec.qty_adjusted, 10) || 0;
+        const rawRemaining = qty_in - qty_sold - qty_dmg + qty_adj;
+        if (rawRemaining < 0) {
+          return res.status(400).json({
+            error: `"${rec.product_name || 'This product'}": qty in (${qty_in}) minus qty sold (${qty_sold}) and qty damaged (${qty_dmg}), plus qty adjusted (${qty_adj}), can't go below 0. That's ${Math.abs(rawRemaining)} more than what's physically possible.`,
+          });
+        }
+      }
+
       const processed = [];
 
       for (const rec of records) {
@@ -61,9 +76,19 @@ const InventoryController = {
         return res.status(400).json({ error: "Product name and quantity in are required" });
       }
 
-      const qty_remaining = Math.max(0,
-        parseInt(qty_in) - parseInt(qty_sold || 0) - parseInt(qty_damaged || 0) + parseInt(qty_adjusted || 0)
-      );
+      const qty_in_int  = parseInt(qty_in);
+      const qty_sold_int = parseInt(qty_sold || 0);
+      const qty_dmg_int  = parseInt(qty_damaged || 0);
+      const qty_adj_int  = parseInt(qty_adjusted || 0);
+      const rawRemaining = qty_in_int - qty_sold_int - qty_dmg_int + qty_adj_int;
+
+      if (rawRemaining < 0) {
+        return res.status(400).json({
+          error: `qty in (${qty_in_int}) minus qty sold (${qty_sold_int}) and qty damaged (${qty_dmg_int}), plus qty adjusted (${qty_adj_int}), can't go below 0. That's ${Math.abs(rawRemaining)} more than what's physically possible.`,
+        });
+      }
+
+      const qty_remaining = rawRemaining;
 
       if (useDB) {
         const r = await pool.query(

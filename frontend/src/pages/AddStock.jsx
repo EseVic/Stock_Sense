@@ -13,7 +13,7 @@ const CITIES = ['Lagos','Abuja','Kano','Port Harcourt','Ibadan','Benin City','Ka
 const today = () => new Date().toISOString().split('T')[0]
 
 const EMPTY = {
-  product_name:'', category:'Grains & Cereals', qty_in:'', qty_sold:'0', qty_damaged:'0',
+  product_name:'', category:'Grains & Cereals', category_other:'', qty_in:'', qty_sold:'0', qty_damaged:'0',
   qty_adjusted:'0', unit_price:'', restock_date: today(), manufacturing_date:'',
   expiry_date:'', shelf_life_days:'', purchase_frequency:'1', restock_count:'1', store_city:'Lagos'
 }
@@ -36,7 +36,6 @@ export default function AddStock() {
 
   const set = k => e => {
     const updated = { ...form, [k]: e.target.value }
-    // Auto-calculate shelf life when manufacturing_date or expiry_date changes
     if (k === 'manufacturing_date' || k === 'expiry_date') {
       const mfg = k === 'manufacturing_date' ? e.target.value : form.manufacturing_date
       const exp = k === 'expiry_date'         ? e.target.value : form.expiry_date
@@ -52,13 +51,16 @@ export default function AddStock() {
 
   const addToQueue = () => {
     if (!form.product_name || !form.qty_in) return setError('Product name and quantity in are required')
-    setRows([...rows, { ...form }]); setForm(EMPTY); setError('')
+    const finalCategory = (form.category === 'Other' && form.category_other.trim()) ? form.category_other.trim() : form.category
+    setRows([...rows, { ...form, category: finalCategory }]); setForm(EMPTY); setError('')
   }
 
   const removeRow = i => setRows(rows.filter((_, idx) => idx !== i))
 
   const submitAll = async () => {
-    const payload = rows.length ? rows : (form.product_name ? [form] : [])
+    const finalCategory = (form.category === 'Other' && form.category_other.trim()) ? form.category_other.trim() : form.category
+    const directSubmit = form.product_name ? [{ ...form, category: finalCategory }] : []
+    const payload = rows.length ? rows : directSubmit
     if (!payload.length) return setError('Add at least one product first')
     setLoading(true); setError(''); setResult(null)
     try {
@@ -124,6 +126,15 @@ export default function AddStock() {
                 <select className="field-input" value={form.category} onChange={set('category')}>
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
+                {form.category === 'Other' && (
+                  <input
+                    className="field-input"
+                    style={{marginTop:8}}
+                    value={form.category_other}
+                    onChange={set('category_other')}
+                    placeholder="Type the category name"
+                  />
+                )}
               </div>
 
               <div>
