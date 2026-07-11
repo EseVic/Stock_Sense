@@ -4,6 +4,7 @@ const auth                = require("../middleware/auth");
 
 router.get("/",        auth, InventoryController.getAll);
 router.post("/",       auth, InventoryController.create);
+router.post("/:id/restock", auth, InventoryController.restock);
 router.patch("/:id",   auth, InventoryController.update);
 router.delete("/:id",  auth, InventoryController.remove);
 

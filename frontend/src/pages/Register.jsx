@@ -42,7 +42,7 @@ export default function Register() {
     return (
       <div className="auth-wrap">
         <div className="auth-left">
-          <Link to="/landing" className="auth-back">
+          <Link to="/" className="auth-back">
             <span className="auth-back-arrow">←</span>
             Back to home
           </Link>
@@ -86,7 +86,7 @@ export default function Register() {
     <div className="auth-wrap">
       <div className="auth-left">
         {/* ── back to landing ── */}
-        <Link to="/landing" className="auth-back">
+        <Link to="/" className="auth-back">
           <span className="auth-back-arrow">←</span>
           Back to home
         </Link>

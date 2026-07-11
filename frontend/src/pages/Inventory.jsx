@@ -6,7 +6,7 @@ import { formatDaysToExpiry, formatDaysCompact } from '../utils/expiry'
 
 const RISK_BADGE  = { Low:'badge-green', Medium:'badge-amber', High:'badge-red', Expired:'badge-dark', '':'badge-gray' }
 
-// Calculate stock status in one place to avoid inconsistent results.
+  // Calculate stock status in one place to avoid inconsistent results.
 function stockStatus(item) {
   if (item.qty_remaining == null || !item.qty_in) return null
   if (item.qty_remaining === 0) return 'out'
@@ -179,6 +179,77 @@ function EditModal({ item, onClose, onSaved }) {
   )
 }
 
+function RestockModal({ item, onClose, onSaved }) {
+  const [qtyAdded,   setQtyAdded]   = useState('')
+  const [expiryDate, setExpiryDate] = useState(item.expiry_date ? item.expiry_date.split('T')[0] : '')
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
+
+  const newQtyIn = item.qty_in + (parseInt(qtyAdded) || 0)
+  const newRemaining = newQtyIn - item.qty_sold - item.qty_damaged + item.qty_adjusted
+
+  const save = async () => {
+    const qty = parseInt(qtyAdded)
+    if (!Number.isInteger(qty) || qty <= 0) return setError('Enter how many units you\'re adding — must be more than 0')
+    setSaving(true); setError('')
+    try {
+      await axios.post(`/api/inventory/${item.id}/restock`, {
+        qty_added: qty,
+        expiry_date: expiryDate || null,
+      })
+      onSaved()
+      onClose()
+    } catch(e) {
+      setError(e.response?.data?.error || 'Restock failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">Restock — {item.product_name}</div>
+        <p style={{fontSize:12,color:'var(--gray)',marginTop:-6,marginBottom:14}}>
+          Currently {item.qty_remaining} of {item.qty_in} remaining. This adds to the SAME
+          product row — use "Add Stock" instead if this is a new batch with a different
+          expiry date you want to track separately.
+        </p>
+
+        <div className="modal-grid">
+          <div className="modal-full">
+            <label className="field-label">Qty being added *</label>
+            <input className="field-input" type="number" value={qtyAdded}
+              onChange={e => setQtyAdded(e.target.value)} placeholder="e.g. 20" autoFocus />
+          </div>
+          <div className="modal-full">
+            <label className="field-label">
+              New expiry date <span style={{color:'var(--gray)',fontWeight:400}}>(optional — leave blank to keep the current one)</span>
+            </label>
+            <input className="field-input" type="date" value={expiryDate}
+              onChange={e => setExpiryDate(e.target.value)} />
+          </div>
+        </div>
+
+        {qtyAdded && !isNaN(parseInt(qtyAdded)) && (
+          <p style={{fontSize:12,color:'var(--green)',marginTop:10}}>
+            New qty in: {newQtyIn} · New remaining: {newRemaining}
+          </p>
+        )}
+
+        {error && <div style={{color:'var(--red)',fontSize:12,marginTop:8}}>{error}</div>}
+
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onClose}>Cancel</button>
+          <button className="modal-save" onClick={save} disabled={saving}>
+            {saving ? 'Restocking…' : 'Restock'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Inventory() {
   const [items,      setItems]    = useState([])
   const [allItems,   setAll]      = useState([])
@@ -191,6 +262,7 @@ export default function Inventory() {
   const [lowStock,   setLow]      = useState([])
   const [showLow,    setShowLow]  = useState(false)
   const [editItem,   setEditItem] = useState(null)
+  const [restockItem, setRestockItem] = useState(null)
   const LIMIT = 20
 
   const load = async () => {
@@ -257,17 +329,20 @@ export default function Inventory() {
           </div>
           <div className="lsp-list">
             {lowStock.map((i, idx) => (
-              <div key={idx} className="lsp-item">
-                <div className="lsp-name">
-                  {i.product_name}
-                  <span className={stockStatus(i) === 'out' ? 'oos-badge' : 'low-badge'} style={{marginLeft:8}}>
-                    {stockStatus(i) === 'out' ? 'Out of stock' : 'Low stock'}
-                  </span>
+              <div key={idx} className="lsp-item" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div>
+                  <div className="lsp-name">
+                    {i.product_name}
+                    <span className={stockStatus(i) === 'out' ? 'oos-badge' : 'low-badge'} style={{marginLeft:8}}>
+                      {stockStatus(i) === 'out' ? 'Out of stock' : 'Low stock'}
+                    </span>
+                  </div>
+                  <div className="lsp-detail">
+                    {i.qty_remaining} units remaining of {i.qty_in} —
+                    <span className="lsp-pct"> {Math.round((i.qty_remaining / i.qty_in) * 100)}% left</span>
+                  </div>
                 </div>
-                <div className="lsp-detail">
-                  {i.qty_remaining} units remaining of {i.qty_in} —
-                  <span className="lsp-pct"> {Math.round((i.qty_remaining / i.qty_in) * 100)}% left</span>
-                </div>
+                <button className="td-edit" onClick={() => setRestockItem(i)} title="Restock">📦 Restock</button>
               </div>
             ))}
           </div>
@@ -324,6 +399,7 @@ export default function Inventory() {
                     <td><Badge label={item.customer_preference} type="pref" /></td>
                     <td><Badge label={item.slow_mover} type="pref" /></td>
                     <td style={{ display: 'flex', gap: 6 }}>
+                      <button className="td-edit" onClick={() => setRestockItem(item)} title="Restock">📦</button>
                       <button className="td-edit" onClick={() => setEditItem(item)} title="Edit">✏️</button>
                       <button className="td-del"  onClick={() => deleteItem(item.id)} title="Delete">✕</button>
                     </td>
@@ -348,6 +424,14 @@ export default function Inventory() {
           item={editItem}
           onClose={() => setEditItem(null)}
           onSaved={() => { setEditItem(null); load() }}
+        />
+      )}
+
+      {restockItem && (
+        <RestockModal
+          item={restockItem}
+          onClose={() => setRestockItem(null)}
+          onSaved={() => { setRestockItem(null); load() }}
         />
       )}
     </div>
