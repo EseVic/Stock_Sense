@@ -1,0 +1,1152 @@
+openapi: 3.0.0
+info:
+  title: StockSense API
+  description: >
+    ML-powered inventory management API for Nigerian retail. Tracks inventory,
+    suppliers, purchase orders and sales history, and calls out to a ML
+    service to predict expiry risk, sales velocity, customer preference and
+    slow-mover status for each product.
+  version: 1.0.0
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:3001/api
+    description: Local development
+  - url: https://stock-sense-backend-vyg2.onrender.com/api
+    description: Production environment
+
+tags:
+  - name: Auth
+  - name: Inventory
+  - name: Predictions
+  - name: Stats
+  - name: ML
+  - name: Suppliers
+  - name: Purchase Orders
+  - name: Sales History
+  - name: Alerts
+  - name: Health
+
+paths:
+  # ───────────────────────────── Health ─────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, enum: [postgres, memory] }
+                  port: { type: integer }
+
+  # ───────────────────────────── Auth ─────────────────────────────
+  /register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, example: Victoria Eze }
+                email: { type: string, format: email, example: vic@example.com }
+                password: { type: string, format: password, minLength: 8 }
+                store_name: { type: string, example: Vic's Mart }
+                city: { type: string, example: Abuja }
+      responses:
+        "200":
+          description: Account created — verification email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  requiresVerification: { type: boolean }
+                  message: { type: string }
+                  email: { type: string }
+        "400":
+          description: Missing fields or email already registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: "#/components/schemas/User" }
+        "401":
+          description: Invalid email or password
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: Email not verified yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  requiresVerification: { type: boolean }
+                  email: { type: string }
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get the current logged-in user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /verify-email:
+    get:
+      tags: [Auth]
+      summary: Verify an email address via the token sent by email
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400":
+          description: Missing, invalid or expired token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /resend-verification:
+    post:
+      tags: [Auth]
+      summary: Resend the email verification link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Verification email sent (or a neutral message if the email doesn't exist)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400":
+          description: Email missing or already verified
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a password reset link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Reset email sent (or a neutral message if the email doesn't exist)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400":
+          description: Email missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using a reset token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "400":
+          description: Missing fields, invalid/expired token, or password too short
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────────── Inventory ─────────────────────────────
+  /inventory:
+    get:
+      tags: [Inventory]
+      summary: List inventory items (paginated, searchable, filterable by risk)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: search
+          in: query
+          description: Filters by product name (partial match)
+          schema: { type: string }
+        - name: risk
+          in: query
+          description: Filters by expiry_risk
+          schema: { type: string, enum: [Low, Medium, High, Expired, N/A] }
+      responses:
+        "200":
+          description: Paginated inventory list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/InventoryItem" }
+                  total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Inventory]
+      summary: Create one or more inventory items
+      description: >
+        Accepts a single object or an array of objects. Each item is validated
+        so qty_sold + qty_damaged − qty_adjusted can't exceed qty_in, then
+        auto-sent to the ML service for prediction (predictions are best-effort —
+        the item still saves if the ML service is unreachable).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/InventoryItemInput"
+                - type: array
+                  items: { $ref: "#/components/schemas/InventoryItemInput" }
+      responses:
+        "200":
+          description: Created items, with predictions applied where available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/InventoryItem" }
+        "400":
+          description: Resulting stock would go below zero
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /inventory/{id}/restock:
+    post:
+      tags: [Inventory]
+      summary: Add stock to an existing inventory item
+      parameters:
+        - $ref: "#/components/parameters/InventoryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qty_added]
+              properties:
+                qty_added: { type: integer, minimum: 1 }
+                expiry_date:
+                  type: string
+                  format: date
+                  description: Optional — overwrites the existing expiry date
+      responses:
+        "200":
+          description: Updated item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryItem" }
+        "400":
+          description: qty_added missing or not a positive whole number
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /inventory/{id}:
+    patch:
+      tags: [Inventory]
+      summary: Update an inventory item
+      parameters:
+        - $ref: "#/components/parameters/InventoryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryItemInput" }
+      responses:
+        "200":
+          description: Updated item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryItem" }
+        "400":
+          description: Missing required fields or resulting stock below zero
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Inventory]
+      summary: Delete an inventory item
+      parameters:
+        - $ref: "#/components/parameters/InventoryId"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ───────────────────────────── Predictions ─────────────────────────────
+  /predict:
+    post:
+      tags: [Predictions]
+      summary: Run ML predictions for a batch of inventory items and persist them
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: integer }
+                  description: Inventory IDs to predict for. Omit to predict for all of the user's items.
+      responses:
+        "200":
+          description: Prediction results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/InventoryItem"
+                        - type: object
+                          properties:
+                            predictions: { $ref: "#/components/schemas/PredictionSet" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Prediction failed (e.g. ML service unreachable)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /predict/simulate:
+    post:
+      tags: [Predictions]
+      summary: What-if simulator — run a prediction without saving anything
+      description: >
+        Lets the frontend show "what would happen if I sold N more units" or
+        "what if this expires in N days" without touching the stored record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inventory_id]
+              properties:
+                inventory_id: { type: integer }
+                qty_sold:
+                  type: integer
+                  description: Hypothetical qty_sold to simulate. Defaults to the current live value.
+                days_to_expiry:
+                  type: integer
+                  description: Hypothetical days_to_expiry to simulate. Defaults to the current live value.
+      responses:
+        "200":
+          description: Simulated prediction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product_name: { type: string }
+                  simulated_values:
+                    type: object
+                    properties:
+                      qty_sold: { type: integer }
+                      qty_remaining: { type: integer }
+                      days_to_expiry: { type: integer, nullable: true }
+                  predictions: { $ref: "#/components/schemas/PredictionSet" }
+                  recommendations:
+                    type: array
+                    items: { type: string }
+        "400":
+          description: inventory_id missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /predict/{id}:
+    post:
+      tags: [Predictions]
+      summary: Run and persist a prediction for a single inventory item
+      parameters:
+        - $ref: "#/components/parameters/InventoryId"
+      responses:
+        "200":
+          description: Prediction result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    maxItems: 1
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/InventoryItem"
+                        - type: object
+                          properties:
+                            predictions: { $ref: "#/components/schemas/PredictionSet" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ───────────────────────────── Stats ─────────────────────────────
+  /stats:
+    get:
+      tags: [Stats]
+      summary: Dashboard summary — totals, risk breakdowns, alerts, savings estimate
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardStats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ───────────────────────────── ML ─────────────────────────────
+  /train:
+    post:
+      tags: [ML]
+      summary: Trigger retraining of the ML models
+      responses:
+        "200":
+          description: Training result (proxied from the Flask ML service)
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Training failed or ML service unreachable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /metrics:
+    get:
+      tags: [ML]
+      summary: Get current model accuracy metrics
+      responses:
+        "200":
+          description: Model metrics (proxied from the Flask ML service)
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: ML service not available
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ───────────────────────────── Suppliers ─────────────────────────────
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List all suppliers
+      responses:
+        "200":
+          description: List of suppliers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Supplier" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Suppliers]
+      summary: Create a supplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierInput" }
+      responses:
+        "200":
+          description: Created supplier
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+        "400":
+          description: Supplier name missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /suppliers/{id}:
+    put:
+      tags: [Suppliers]
+      summary: Update a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierInput" }
+      responses:
+        "200":
+          description: Updated supplier
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Suppliers]
+      summary: Delete a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ───────────────────────────── Purchase Orders ─────────────────────────────
+  /purchase-orders:
+    get:
+      tags: [Purchase Orders]
+      summary: List purchase orders (paginated, filterable by status)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, received, cancelled] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Paginated purchase orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/PurchaseOrder" }
+                  total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Purchase Orders]
+      summary: Create a purchase order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_name, quantity]
+              properties:
+                product_name: { type: string }
+                category: { type: string, default: Other }
+                quantity: { type: integer }
+                unit_price: { type: number, default: 0 }
+                supplier_id: { type: integer, nullable: true }
+                order_date: { type: string, format: date }
+                expected_date: { type: string, format: date, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Created purchase order (status defaults to "pending")
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseOrder" }
+        "400":
+          description: product_name or quantity missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /purchase-orders/{id}:
+    patch:
+      tags: [Purchase Orders]
+      summary: Update a purchase order's status
+      description: >
+        Setting status to "received" auto-creates a matching inventory item
+        (and best-effort runs an ML prediction on it).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [pending, received, cancelled] }
+                received_date: { type: string, format: date }
+                notes: { type: string }
+                expiry_date:
+                  type: string
+                  format: date
+                  description: Used only when status is "received", for the auto-created inventory item
+                store_city:
+                  type: string
+                  description: Used only when status is "received", for the auto-created inventory item
+      responses:
+        "200":
+          description: >
+            Updated purchase order. If status was set to "received", includes
+            inventory_item (the auto-created inventory record) or
+            inventory_warning if that creation failed.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PurchaseOrder"
+                  - type: object
+                    properties:
+                      inventory_item: { $ref: "#/components/schemas/InventoryItem" }
+                      inventory_warning: { type: string }
+        "400":
+          description: Invalid status value
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Purchase Orders]
+      summary: Delete a purchase order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ───────────────────────────── Sales History ─────────────────────────────
+  /sales-history:
+    get:
+      tags: [Sales History]
+      summary: List sales history (paginated, filterable by product and date range)
+      parameters:
+        - name: product
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        "200":
+          description: Paginated sales history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/SalesRecord" }
+                  total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Sales History]
+      summary: Log a sale
+      description: >
+        Validates against remaining stock to prevent overselling, then syncs
+        qty_sold/qty_remaining on the matching inventory item (matched by
+        inventory_id if given, otherwise by product name) and re-runs an ML
+        prediction on it in the background.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_name, qty_sold]
+              properties:
+                product_name: { type: string }
+                category: { type: string, default: Other }
+                store_city: { type: string, default: Lagos }
+                qty_sold: { type: integer, minimum: 1 }
+                unit_price: { type: number, default: 0 }
+                sale_date: { type: string, format: date }
+                inventory_id:
+                  type: integer
+                  nullable: true
+                  description: Matches to a specific inventory item; if omitted, the most recently created item with the same product name is used
+                notes: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Created sales record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SalesRecord" }
+        "400":
+          description: Missing fields, qty_sold not a positive integer, or qty_sold exceeds remaining stock
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /sales-history/summary:
+    get:
+      tags: [Sales History]
+      summary: Daily sales summary and top products over a trailing window
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        "200":
+          description: Summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  daily:
+                    type: array
+                    items: { type: object }
+                  topProducts:
+                    type: array
+                    items: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /sales-history/{id}:
+    delete:
+      tags: [Sales History]
+      summary: Delete a sales record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ───────────────────────────── Alerts ─────────────────────────────
+  /alerts/run:
+    post:
+      tags: [Alerts]
+      summary: Run the daily alert digest for every user (cron job endpoint)
+      description: >
+        Called by an external scheduler (GitHub Actions), not by a logged-in
+        user. Authenticated with a shared secret instead of a JWT.
+      security:
+        - cronSecret: []
+      responses:
+        "200":
+          description: Digest run summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usersChecked: { type: integer }
+                  emailsSent: { type: integer }
+                  failures:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { type: integer }
+                        email: { type: string }
+                        error: { type: string }
+        "401":
+          description: Invalid or missing cron secret
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: CRON_SECRET not configured on the server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  parameters:
+    InventoryId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT returned by /login, sent as "Authorization: Bearer <token>"'
+    cronSecret:
+      type: apiKey
+      in: header
+      name: X-Cron-Secret
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        store_name: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        is_verified: { type: boolean }
+
+    InventoryItemInput:
+      type: object
+      required: [product_name, qty_in]
+      properties:
+        product_name: { type: string }
+        category: { type: string }
+        store_city: { type: string, default: Lagos }
+        qty_in: { type: integer }
+        qty_sold: { type: integer, default: 0 }
+        qty_damaged: { type: integer, default: 0 }
+        qty_adjusted: { type: integer, default: 0 }
+        unit_price: { type: number, default: 0 }
+        restock_date: { type: string, format: date }
+        expiry_date: { type: string, format: date, nullable: true }
+        shelf_life_days: { type: integer }
+        no_expiry:
+          type: boolean
+          description: Skips expiry-risk prediction for non-perishable products
+
+    InventoryItem:
+      allOf:
+        - $ref: "#/components/schemas/InventoryItemInput"
+        - type: object
+          properties:
+            id: { type: integer }
+            user_id: { type: integer }
+            qty_remaining: { type: integer }
+            days_to_expiry:
+              type: integer
+              description: Computed live on every request from expiry_date; 9999 means no expiry
+            weekly_sales_rate: { type: number }
+            sell_through_rate: { type: number }
+            wastage_rate: { type: number }
+            shelf_utilisation: { type: number }
+            purchase_frequency: { type: integer }
+            restock_count: { type: integer }
+            expiry_risk:
+              type: string
+              enum: [Low, Medium, High, Expired, N/A]
+              description: Computed live from days_to_expiry
+            sales_velocity: { type: string, enum: [Slow, Moderate, Fast] }
+            customer_preference: { type: string }
+            slow_mover: { type: string, enum: ["Yes", "No"] }
+            prediction_confidence: { type: number }
+            recommendation: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+
+    PredictionSet:
+      type: object
+      description: Keyed by prediction task (expiry_risk, sales_velocity, customer_preference, slow_mover)
+      additionalProperties:
+        type: object
+        properties:
+          value: { type: string }
+          confidence: { type: number }
+          recommendation: { type: string }
+
+    DashboardStats:
+      type: object
+      properties:
+        total: { type: integer }
+        highRisk: { type: integer }
+        slowMovers: { type: integer }
+        revenue: { type: number }
+        lowStock:
+          type: array
+          items:
+            type: object
+            properties:
+              product: { type: string }
+              remaining: { type: integer }
+              qtyIn: { type: integer }
+              pct: { type: integer }
+        topCategories:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              revenue: { type: number }
+        byRisk:
+          type: object
+          properties:
+            Low: { type: integer }
+            Medium: { type: integer }
+            High: { type: integer }
+            Expired: { type: integer }
+        byVel:
+          type: object
+          properties:
+            Slow: { type: integer }
+            Moderate: { type: integer }
+            Fast: { type: integer }
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              product: { type: string }
+              type: { type: string, enum: [Expired, Expiry Risk, Slow Mover] }
+              severity: { type: string, enum: [critical, high, medium] }
+              days: { type: integer }
+        productMap:
+          type: array
+          description: Per-product value + risk bucket, for the dashboard treemap
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              category: { type: string }
+              value: { type: number }
+              size: { type: number, description: "log10(value + 1) — used for treemap sizing" }
+              risk: { type: string }
+        savings:
+          type: object
+          properties:
+            potentialLoss: { type: number, description: Value of expired stock still on shelf }
+            potentialSavings: { type: number, description: Estimated recoverable value from acting on High-risk stock early }
+            capitalTiedUp: { type: number, description: Value of stock tagged as a slow mover }
+            expiredCount: { type: integer }
+            highRiskCount: { type: integer }
+            slowMoverCount: { type: integer }
+
+    SupplierInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        contact_name: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    Supplier:
+      allOf:
+        - $ref: "#/components/schemas/SupplierInput"
+        - type: object
+          properties:
+            id: { type: integer }
+            user_id: { type: integer }
+            created_at: { type: string, format: date-time }
+
+    PurchaseOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        supplier_id: { type: integer, nullable: true }
+        product_name: { type: string }
+        category: { type: string }
+        quantity: { type: integer }
+        unit_price: { type: number }
+        total_cost: { type: number, description: "Generated column: quantity × unit_price" }
+        status: { type: string, enum: [pending, received, cancelled] }
+        order_date: { type: string, format: date }
+        expected_date: { type: string, format: date, nullable: true }
+        received_date: { type: string, format: date, nullable: true }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    SalesRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        inventory_id: { type: integer, nullable: true }
+        product_name: { type: string }
+        category: { type: string }
+        store_city: { type: string }
+        qty_sold: { type: integer }
+        unit_price: { type: number }
+        revenue: { type: number, description: "Generated column: qty_sold × unit_price" }
+        sale_date: { type: string, format: date }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+security:
+  - bearerAuth: []
