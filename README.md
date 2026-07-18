@@ -143,7 +143,7 @@ cp backend/.env.example backend/.env
 ### Running with Docker (Recommended)
 
 ```bash
-git clone https://github.com/your-username/stocksense.git
+git clone https://github.com/EseVic/Stock_Sense.git
 cd stocksense
 docker-compose up --build
 ```
@@ -317,14 +317,15 @@ The Express backend exposes a REST API at port `3001`.
 
 | Prefix | Description |
 |---|---|
-| `/api/auth` | Register, login, logout, email verification, password reset |
-| `/api/inventory` | CRUD for inventory items, CSV import support |
+| `/api/register`, `/api/login`, `/api/me`, etc. | Register, login, email verification, password reset (no `/auth` sub-prefix, and no logout endpoint — JWT is stateless) |
+| `/api/inventory` | CRUD for inventory items (bulk create via JSON array; no file/CSV upload endpoint yet) |
 | `/api/suppliers` | Supplier management |
 | `/api/purchase-orders` | Create and track purchase orders |
 | `/api/sales-history` | Log and retrieve sales records |
 | `/api/stats` | Dashboard aggregates and KPIs |
-| `/api/ml` | Proxy to the ML service for training |
+| `/api/train`, `/api/metrics` | Proxy to the ML service for training and metrics (no `/ml` sub-prefix) |
 | `/api/predict` | Proxy to the ML service for predictions |
+
 
 Swagger/OpenAPI documentation is available at `/api/docs` when the backend is running.
 

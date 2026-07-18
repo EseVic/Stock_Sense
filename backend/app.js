@@ -1,5 +1,8 @@
 const express = require("express");
 const cors    = require("cors");
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
+const path = require("path");
 
 const authRoutes          = require("./src/routes/auth.routes");
 const inventoryRoutes     = require("./src/routes/inventory.routes");
@@ -16,6 +19,10 @@ const app = express();
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "20mb" }));
+
+// ── API docs (Swagger UI) ───────────────────────────────────────────────────
+const openapiSpec = YAML.load(path.join(__dirname, "src/docs/openapi.yaml"));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api",                authRoutes);       
