@@ -4,6 +4,25 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
          BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts'
 import './ModelMetrics.css'
 
+// Recharts colors (grid lines, axis ticks) are inline SVG props, not CSS —
+// a CSS dark-mode rule can never reach them. This reads the same
+// html.app-dark class Layout.jsx toggles, and re-checks it whenever that
+// class changes, so switching theme updates the chart without a reload.
+function useIsDark() {
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.classList.contains('app-dark')
+  )
+  useEffect(() => {
+    const el = document.documentElement
+    const obs = new MutationObserver(
+      () => setIsDark(el.classList.contains('app-dark'))
+    )
+    obs.observe(el, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+  return isDark
+}
+
 const TASK_LABELS = {
   expiry_risk:         'Expiry Risk',
   sales_velocity:      'Sales Velocity',
@@ -24,12 +43,16 @@ function TaskCard({ task, data }) {
   const dt = data.decision_tree
   const lr = data.logistic_regression
   const winner = data.best_model
+  const isDark = useIsDark()
+  const gridStroke = isDark ? '#30363d' : '#e2e8f0'
+  const tickFill   = isDark ? '#8b949e' : '#4A5568'
 
   const radarData = [
     { metric: 'Accuracy', DT: Math.round(dt.accuracy*100), LR: Math.round(lr.accuracy*100) },
-    { metric: 'F1 Score', DT: Math.round(dt.f1_weighted*100), LR: Math.round(lr.f1_weighted*100) },
+    { metric: 'F1 (weighted)', DT: Math.round(dt.f1_weighted*100), LR: Math.round(lr.f1_weighted*100) },
     { metric: 'Precision', DT: Math.round((dt.report?.['weighted avg']?.precision||0)*100), LR: Math.round((lr.report?.['weighted avg']?.precision||0)*100) },
     { metric: 'Recall', DT: Math.round((dt.report?.['weighted avg']?.recall||0)*100), LR: Math.round((lr.report?.['weighted avg']?.recall||0)*100) },
+    { metric: 'F1 (macro)', DT: Math.round((dt.f1_macro ?? dt.report?.['macro avg']?.['f1-score'] ?? 0)*100), LR: Math.round((lr.f1_macro ?? lr.report?.['macro avg']?.['f1-score'] ?? 0)*100) },
   ]
 
   const classRows = data.classes || []
@@ -58,16 +81,20 @@ function TaskCard({ task, data }) {
                   <MetricBadge value={m.accuracy} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">F1 Score</span>
+                  <span className="mm-label">F1 (weighted)</span>
                   <MetricBadge value={m.f1_weighted} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Precision</span>
+                  <span className="mm-label">Precision (weighted)</span>
                   <MetricBadge value={m.report?.['weighted avg']?.precision||0} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Recall</span>
+                  <span className="mm-label">Recall (weighted)</span>
                   <MetricBadge value={m.report?.['weighted avg']?.recall||0} />
+                </div>
+                <div className="mm-row">
+                  <span className="mm-label">F1 (macro)</span>
+                  <MetricBadge value={m.f1_macro ?? m.report?.['macro avg']?.['f1-score'] ?? 0} />
                 </div>
               </div>
             </div>
@@ -79,8 +106,8 @@ function TaskCard({ task, data }) {
           <p className="chart-sub">DT vs LR comparison</p>
           <ResponsiveContainer width="100%" height={180}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="#e2e8f0" />
-              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
+              <PolarGrid stroke={gridStroke} />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: tickFill }} />
               <Radar name="Decision Tree" dataKey="DT" stroke={GREEN} fill={GREEN} fillOpacity={0.15} strokeWidth={2} />
               <Radar name="Log. Regression" dataKey="LR" stroke={AMBER} fill={AMBER} fillOpacity={0.1} strokeWidth={2} strokeDasharray="4 2" />
               <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
@@ -125,6 +152,8 @@ export default function ModelMetrics() {
   const [loading,  setLoading]  = useState(true)
   const [training, setTraining] = useState(false)
   const [error,    setError]    = useState('')
+  const isDark = useIsDark()
+  const tickFill = isDark ? '#8b949e' : '#4A5568'
 
   const load = async () => {
     setLoading(true); setError('')
@@ -186,8 +215,8 @@ export default function ModelMetrics() {
             <h3 className="chart-title">Overall accuracy — all tasks</h3>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={summaryData} margin={{ left: 0, right: 20 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tickFormatter={v => v + '%'} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickFill }} />
+                <YAxis domain={[0, 100]} tickFormatter={v => v + '%'} tick={{ fontSize: 11, fill: tickFill }} />
                 <Tooltip formatter={v => v + '%'} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="DT Accuracy" fill={GREEN} radius={[4,4,0,0]} />

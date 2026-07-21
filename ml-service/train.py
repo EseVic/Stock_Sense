@@ -24,6 +24,8 @@ from sklearn.metrics import (
     classification_report,
     accuracy_score,
     f1_score,
+    precision_score,
+    recall_score,
 )
 
 
@@ -336,10 +338,42 @@ def train_all_models():
             average="weighted",
         )
 
+        # Macro-average metrics. Unlike weighted average, these treat every
+        # class equally regardless of how many samples it has, so they don't
+        # collapse to the same number as accuracy the way weighted recall
+        # always does. Useful for spotting a model that's only doing well on
+        # the dominant class.
+        dt_precision_macro = precision_score(
+            y_test,
+            dt_predictions,
+            average="macro",
+            zero_division=0,
+        )
+
+        dt_recall_macro = recall_score(
+            y_test,
+            dt_predictions,
+            average="macro",
+            zero_division=0,
+        )
+
+        dt_f1_macro = f1_score(
+            y_test,
+            dt_predictions,
+            average="macro",
+        )
+
         print(
             "\nDecision Tree "
             f"Accuracy: {dt_accuracy:.4f} "
-            f"F1: {dt_f1:.4f}"
+            f"F1 (weighted): {dt_f1:.4f}"
+        )
+
+        print(
+            "Decision Tree macro avg "
+            f"Precision: {dt_precision_macro:.4f} "
+            f"Recall: {dt_recall_macro:.4f} "
+            f"F1: {dt_f1_macro:.4f}"
         )
 
         print(
@@ -385,10 +419,37 @@ def train_all_models():
             average="weighted",
         )
 
+        lr_precision_macro = precision_score(
+            y_test,
+            lr_predictions,
+            average="macro",
+            zero_division=0,
+        )
+
+        lr_recall_macro = recall_score(
+            y_test,
+            lr_predictions,
+            average="macro",
+            zero_division=0,
+        )
+
+        lr_f1_macro = f1_score(
+            y_test,
+            lr_predictions,
+            average="macro",
+        )
+
         print(
             "\nLogistic Regression "
             f"Accuracy: {lr_accuracy:.4f} "
-            f"F1: {lr_f1:.4f}"
+            f"F1 (weighted): {lr_f1:.4f}"
+        )
+
+        print(
+            "Logistic Regression macro avg "
+            f"Precision: {lr_precision_macro:.4f} "
+            f"Recall: {lr_recall_macro:.4f} "
+            f"F1: {lr_f1_macro:.4f}"
         )
 
         print(
@@ -441,6 +502,21 @@ def train_all_models():
                     4,
                 ),
 
+                "precision_macro": round(
+                    dt_precision_macro,
+                    4,
+                ),
+
+                "recall_macro": round(
+                    dt_recall_macro,
+                    4,
+                ),
+
+                "f1_macro": round(
+                    dt_f1_macro,
+                    4,
+                ),
+
                 "report": classification_report(
                     y_test,
                     dt_predictions,
@@ -459,6 +535,21 @@ def train_all_models():
 
                 "f1_weighted": round(
                     lr_f1,
+                    4,
+                ),
+
+                "precision_macro": round(
+                    lr_precision_macro,
+                    4,
+                ),
+
+                "recall_macro": round(
+                    lr_recall_macro,
+                    4,
+                ),
+
+                "f1_macro": round(
+                    lr_f1_macro,
                     4,
                 ),
 
@@ -518,14 +609,16 @@ def train_all_models():
     print(
         f"{'Task':<25} "
         f"{'DT Acc':>8} "
-        f"{'DT F1':>8} "
+        f"{'DT F1(w)':>8} "
+        f"{'DT F1(m)':>8} "
         f"{'LR Acc':>8} "
-        f"{'LR F1':>8} "
+        f"{'LR F1(w)':>8} "
+        f"{'LR F1(m)':>8} "
         f"{'Winner'}"
     )
 
     print(
-        "-" * 80
+        "-" * 96
     )
 
     for task in TARGET_COLS:
@@ -544,8 +637,10 @@ def train_all_models():
                 f"{task:<25} "
                 f"{dt_report['accuracy'] * 100:>7.2f}% "
                 f"{dt_report['f1_weighted'] * 100:>7.2f}% "
+                f"{dt_report['f1_macro'] * 100:>7.2f}% "
                 f"{lr_report['accuracy'] * 100:>7.2f}% "
                 f"{lr_report['f1_weighted'] * 100:>7.2f}% "
+                f"{lr_report['f1_macro'] * 100:>7.2f}% "
                 f"{report['best_model']}"
             )
 
