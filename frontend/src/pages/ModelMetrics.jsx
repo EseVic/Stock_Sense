@@ -27,9 +27,10 @@ function TaskCard({ task, data }) {
 
   const radarData = [
     { metric: 'Accuracy', DT: Math.round(dt.accuracy*100), LR: Math.round(lr.accuracy*100) },
-    { metric: 'F1 Score', DT: Math.round(dt.f1_weighted*100), LR: Math.round(lr.f1_weighted*100) },
+    { metric: 'F1 (weighted)', DT: Math.round(dt.f1_weighted*100), LR: Math.round(lr.f1_weighted*100) },
     { metric: 'Precision', DT: Math.round((dt.report?.['weighted avg']?.precision||0)*100), LR: Math.round((lr.report?.['weighted avg']?.precision||0)*100) },
     { metric: 'Recall', DT: Math.round((dt.report?.['weighted avg']?.recall||0)*100), LR: Math.round((lr.report?.['weighted avg']?.recall||0)*100) },
+    { metric: 'F1 (macro)', DT: Math.round((dt.f1_macro ?? dt.report?.['macro avg']?.['f1-score'] ?? 0)*100), LR: Math.round((lr.f1_macro ?? lr.report?.['macro avg']?.['f1-score'] ?? 0)*100) },
   ]
 
   const classRows = data.classes || []
@@ -58,16 +59,20 @@ function TaskCard({ task, data }) {
                   <MetricBadge value={m.accuracy} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">F1 Score</span>
+                  <span className="mm-label">F1 (weighted)</span>
                   <MetricBadge value={m.f1_weighted} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Precision</span>
+                  <span className="mm-label">Precision (weighted)</span>
                   <MetricBadge value={m.report?.['weighted avg']?.precision||0} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Recall</span>
+                  <span className="mm-label">Recall (weighted)</span>
                   <MetricBadge value={m.report?.['weighted avg']?.recall||0} />
+                </div>
+                <div className="mm-row">
+                  <span className="mm-label">F1 (macro)</span>
+                  <MetricBadge value={m.f1_macro ?? m.report?.['macro avg']?.['f1-score'] ?? 0} />
                 </div>
               </div>
             </div>
