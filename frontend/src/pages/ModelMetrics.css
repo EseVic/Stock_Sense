@@ -113,12 +113,35 @@
 .empty-metrics code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 /* ════ DARK MODE ════ */
-html.app-dark .metrics-card,
-html.app-dark .metrics-table-wrap { background:#161b22 !important; }
-html.app-dark .metrics-table th   { background:#21262d !important; color:#8b949e !important; border-bottom-color:#30363d !important; }
-html.app-dark .metrics-table td   { color:#e6edf3 !important; border-bottom-color:#30363d !important; }
-html.app-dark .metrics-table tr:hover td { background:rgba(255,255,255,.03) !important; }
-html.app-dark .metrics-label { color:#8b949e; }
-html.app-dark .metrics-val   { color:#e6edf3; }
-html.app-dark .page-title { color:#e6edf3; }
-html.app-dark .page-sub   { color:#8b949e; }
+/* The classes below match what ModelMetrics.jsx actually renders
+   (.overview-card / .task-card / .mm-label / .class-table etc) —
+   the previous block here targeted .metrics-card / .metrics-table /
+   .metrics-label, none of which exist in this file, so none of it
+   ever applied. */
+html.app-dark .overview-card,
+html.app-dark .task-card { background:#161b22 !important; box-shadow:none !important; }
+
+html.app-dark .task-hd { background:#0d1117 !important; border-bottom-color:#30363d !important; }
+html.app-dark .task-title,
+html.app-dark .chart-title { color:#e6edf3 !important; }
+html.app-dark .task-winner,
+html.app-dark .chart-sub,
+html.app-dark .trained-at,
+html.app-dark .mm-label,
+html.app-dark .td-support { color:#8b949e !important; }
+
+html.app-dark .model-col { border-color:#30363d !important; }
+html.app-dark .model-winner { background:rgba(27,122,90,0.12) !important; border-color:var(--green) !important; }
+html.app-dark .model-name { color:#e6edf3 !important; }
+
+html.app-dark .class-table th { background:#21262d !important; color:#8b949e !important; border-bottom-color:#30363d !important; }
+html.app-dark .class-table td { color:#e6edf3 !important; border-bottom-color:#30363d !important; }
+html.app-dark .class-label { background:#21262d !important; color:#e6edf3 !important; }
+
+html.app-dark .metrics-error { background:#2d2510 !important; border-color:#5a4a1a !important; }
+html.app-dark .metrics-error p { color:#8b949e !important; }
+html.app-dark .metrics-error code,
+html.app-dark .empty-metrics code { background:rgba(255,255,255,0.08) !important; color:#e6edf3 !important; }
+
+html.app-dark .empty-metrics h2 { color:#e6edf3 !important; }
+html.app-dark .empty-metrics p  { color:#8b949e !important; }
