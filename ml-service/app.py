@@ -512,8 +512,7 @@ def predict():
                         1,
                     )
 
-                # Use the model selected during evaluation instead of always
-                # preferring the Decision Tree simply because it is present.
+                # Use the model selected during evaluation 
                 best_model = (
                     MODELS.get("metrics", {})
                     .get(task, {})

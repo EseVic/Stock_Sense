@@ -76,9 +76,6 @@ TASK_FEATURES = {
     ],
 }
 
-# Customer preference is product-specific. These are legitimate serving-time
-# attributes (unlike purchase_frequency and total_units_sold_all, which were
-# used to create the target and would leak the answer into the model).
 CUSTOMER_CATEGORICAL_FEATURES = [
     "product_name",
     "category",
@@ -112,10 +109,6 @@ def load_data():
     """
     Load the StockSense inventory training dataset.
     """
-
-    # Keep the Hugging Face deployment on the same audited source as the
-    # root ML service. The encoded retail file has different targets and
-    # granularity, so silently substituting it changes every reported metric.
     paths = [
         "data/StockSense-Inventory.csv",
         "data/inventory_cleaned.csv",
@@ -228,9 +221,6 @@ def train_all_models():
 
     df = load_data()
 
-    # Refuse to repeat the stale-data failure that made almost every live
-    # product "Expired". Augmentation is performed before this modelling
-    # table is supplied; the held-out split below remains untouched.
     expiry_distribution = (
         df["expiry_risk"]
         .astype(str)
