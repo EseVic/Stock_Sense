@@ -1,17 +1,6 @@
 const { pool, memStore } = require("../db");
 const { calculateDaysToExpiry } = require("../utils/inventory.utils");
 
-// Calculate days_to_expiry and expiry_risk values dynamically
-// on every request to keep them up to date  instead of using stored values.
-// 
-function liveExpiryRisk(days) {
-  if (days >= 9999) return "N/A";
-  if (days < 0) return "Expired";
-  if (days <= 7) return "High";
-  if (days <= 30) return "Medium";
-  return "Low";
-}
-
 function withLiveExpiry(row) {
   if (!row) return row;
   const days_to_expiry = row.expiry_date
@@ -20,7 +9,6 @@ function withLiveExpiry(row) {
   return {
     ...row,
     days_to_expiry,
-    expiry_risk: liveExpiryRisk(days_to_expiry),
   };
 }
 
@@ -80,21 +68,22 @@ const InventoryModel = {
     return item;
   },
 
-  async updatePredictions({ id, expiry_risk, sales_velocity, customer_preference, slow_mover, prediction_confidence, recommendation }, useDB) {
+  async updatePredictions({ id, expiry_risk, sales_velocity, customer_preference, slow_mover, prediction_confidence, recommendation, prediction_details }, useDB) {
     if (useDB) {
       await pool.query(
         `UPDATE inventory
          SET expiry_risk=$1, sales_velocity=$2, customer_preference=$3,
-             slow_mover=$4, prediction_confidence=$5, recommendation=$6
-         WHERE id=$7`,
-        [expiry_risk, sales_velocity, customer_preference, slow_mover, prediction_confidence, recommendation, id]
+             slow_mover=$4, prediction_confidence=$5, recommendation=$6,
+             prediction_details=$7::jsonb
+         WHERE id=$8`,
+        [expiry_risk, sales_velocity, customer_preference, slow_mover, prediction_confidence, recommendation, JSON.stringify(prediction_details || {}), id]
       );
     } else {
       const idx = memStore.inventory.findIndex((m) => m.id === id);
       if (idx >= 0) {
         Object.assign(memStore.inventory[idx], {
           expiry_risk, sales_velocity, customer_preference,
-          slow_mover, prediction_confidence, recommendation,
+          slow_mover, prediction_confidence, recommendation, prediction_details,
         });
       }
     }

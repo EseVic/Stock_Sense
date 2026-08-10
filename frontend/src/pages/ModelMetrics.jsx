@@ -34,10 +34,16 @@ const GREEN = '#1B7A5A'
 const AMBER = '#C47D0E'
 
 function MetricBadge({ value, threshold=0.80 }) {
-  const pct = Math.round(value * 100)
+  const pct = Number(value * 100)
   const color = pct >= threshold*100 ? GREEN : pct >= 70 ? AMBER : '#C0392B'
-  return <span className="metric-badge" style={{ background: color+'18', color }}>{pct}%</span>
+  return <span className="metric-badge" style={{ background: color+'18', color }}>{pct.toFixed(1)}%</span>
 }
+
+// Macro averages give every class equal importance. Prefer the explicit values
+// returned by the ML service, with the classification report as a fallback.
+const macroPrecision = m => m.precision_macro ?? m.report?.['macro avg']?.precision ?? 0
+const macroRecall = m => m.recall_macro ?? m.report?.['macro avg']?.recall ?? 0
+const macroF1 = m => m.f1_macro ?? m.report?.['macro avg']?.['f1-score'] ?? 0
 
 function TaskCard({ task, data }) {
   const dt = data.decision_tree
@@ -50,9 +56,9 @@ function TaskCard({ task, data }) {
   const radarData = [
     { metric: 'Accuracy', DT: Math.round(dt.accuracy*100), LR: Math.round(lr.accuracy*100) },
     { metric: 'F1 (weighted)', DT: Math.round(dt.f1_weighted*100), LR: Math.round(lr.f1_weighted*100) },
-    { metric: 'Precision', DT: Math.round((dt.report?.['weighted avg']?.precision||0)*100), LR: Math.round((lr.report?.['weighted avg']?.precision||0)*100) },
-    { metric: 'Recall', DT: Math.round((dt.report?.['weighted avg']?.recall||0)*100), LR: Math.round((lr.report?.['weighted avg']?.recall||0)*100) },
-    { metric: 'F1 (macro)', DT: Math.round((dt.f1_macro ?? dt.report?.['macro avg']?.['f1-score'] ?? 0)*100), LR: Math.round((lr.f1_macro ?? lr.report?.['macro avg']?.['f1-score'] ?? 0)*100) },
+    { metric: 'Precision (macro)', DT: Math.round(macroPrecision(dt)*100), LR: Math.round(macroPrecision(lr)*100) },
+    { metric: 'Recall (macro)', DT: Math.round(macroRecall(dt)*100), LR: Math.round(macroRecall(lr)*100) },
+    { metric: 'F1 (macro)', DT: Math.round(macroF1(dt)*100), LR: Math.round(macroF1(lr)*100) },
   ]
 
   const classRows = data.classes || []
@@ -68,6 +74,12 @@ function TaskCard({ task, data }) {
 
       <div className="task-body">
         {/* Summary metrics */}
+        <p className="metrics-explanation">
+          Evaluated on a stratified 70/30 split of the augmented modelling data.
+          Decision Tree probabilities use five-fold sigmoid calibration, so confidence is not raw leaf purity.
+          Summary precision, recall and macro F1 give every class equal importance; the per-class table below shows where errors occur.
+          Green is at least 80%, amber is 70-79.9%, and red is below 70%; these colours report performance and do not change the scores.
+        </p>
         <div className="model-compare">
           {[['Decision Tree', dt, 'dt'], ['Logistic Regression', lr, 'lr']].map(([name, m, key]) => (
             <div key={key} className={`model-col${winner===name?' model-winner':''}`}>
@@ -85,16 +97,16 @@ function TaskCard({ task, data }) {
                   <MetricBadge value={m.f1_weighted} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Precision (weighted)</span>
-                  <MetricBadge value={m.report?.['weighted avg']?.precision||0} />
+                  <span className="mm-label">Precision (macro)</span>
+                  <MetricBadge value={macroPrecision(m)} />
                 </div>
                 <div className="mm-row">
-                  <span className="mm-label">Recall (weighted)</span>
-                  <MetricBadge value={m.report?.['weighted avg']?.recall||0} />
+                  <span className="mm-label">Recall (macro)</span>
+                  <MetricBadge value={macroRecall(m)} />
                 </div>
                 <div className="mm-row">
                   <span className="mm-label">F1 (macro)</span>
-                  <MetricBadge value={m.f1_macro ?? m.report?.['macro avg']?.['f1-score'] ?? 0} />
+                  <MetricBadge value={macroF1(m)} />
                 </div>
               </div>
             </div>
@@ -111,7 +123,16 @@ function TaskCard({ task, data }) {
               <Radar name="Decision Tree" dataKey="DT" stroke={GREEN} fill={GREEN} fillOpacity={0.15} strokeWidth={2} />
               <Radar name="Log. Regression" dataKey="LR" stroke={AMBER} fill={AMBER} fillOpacity={0.1} strokeWidth={2} strokeDasharray="4 2" />
               <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip formatter={v => v + '%'} />
+              <Tooltip
+                formatter={v => v + '%'}
+                contentStyle={{
+                  background: isDark ? '#161b22' : '#ffffff',
+                  border: `1px solid ${gridStroke}`,
+                  borderRadius: 8,
+                  color: isDark ? '#e6edf3' : '#1f2937',
+                }}
+                labelStyle={{ color: isDark ? '#e6edf3' : '#1f2937' }}
+              />
             </RadarChart>
           </ResponsiveContainer>
         </div>

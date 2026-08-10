@@ -199,6 +199,11 @@ function applyPredictions(preds = {}) {
     prediction_confidence:
       preds.expiry_risk?.confidence || null,
 
+    // Persist the selected model, real confidence, and DT/LR audit result
+    // for every task so the frontend does not invent display percentages.
+    prediction_details:
+      preds,
+
     recommendation:
       topRec || null,
   };

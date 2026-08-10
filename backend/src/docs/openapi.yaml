@@ -1008,11 +1008,13 @@ components:
             expiry_risk:
               type: string
               enum: [Low, Medium, High, Expired, N/A]
-              description: Computed live from days_to_expiry
+              description: Current status calculated from the live expiry date; N/A when no expiry date exists
             sales_velocity: { type: string, enum: [Slow, Moderate, Fast] }
             customer_preference: { type: string }
             slow_mover: { type: string, enum: ["Yes", "No"] }
             prediction_confidence: { type: number }
+            prediction_details:
+              $ref: "#/components/schemas/PredictionSet"
             recommendation: { type: string, nullable: true }
             created_at: { type: string, format: date-time }
 
@@ -1022,8 +1024,19 @@ components:
       additionalProperties:
         type: object
         properties:
-          value: { type: string }
+          label: { type: string }
           confidence: { type: number }
+          urgency:
+            type: number
+            nullable: true
+            description: Live 0-100 expiry urgency score; distinct from ML confidence
+          model: { type: string, nullable: true }
+          ml_assessment:
+            type: object
+            nullable: true
+            description: Experimental classifier output retained for audit when the operational expiry status uses the live date
+          dt: { type: object }
+          lr: { type: object }
           recommendation: { type: string }
 
     DashboardStats:

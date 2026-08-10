@@ -60,6 +60,15 @@
 .task-winner strong { color: var(--green); }
 
 .task-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
+.metrics-explanation {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--gray-lt);
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.45;
+}
 
 .model-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .model-col {

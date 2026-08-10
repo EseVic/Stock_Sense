@@ -376,18 +376,28 @@ const PredictController = {
         use_days_to_expiry_override: true,
       };
 
+      // Evaluate current and simulated states together so the comparison uses
+      // the same live model version and is not based on stale saved labels.
+      const currentRecord = {
+        ...liveBase,
+        use_days_to_expiry_override: true,
+      };
+
       const mlRes = await axios.post(
         `${ML_URL}/predict`,
         {
-          records: [simRecord],
+          records: [currentRecord, simRecord],
         },
         {
           timeout: 30000,
         },
       );
 
-      const predictions =
+      const currentPredictions =
         mlRes.data.results?.[0]?.predictions || {};
+
+      const predictions =
+        mlRes.data.results?.[1]?.predictions || {};
 
       const recommendations = Object.values(predictions)
         .map((prediction) => prediction?.recommendation)
@@ -395,12 +405,21 @@ const PredictController = {
 
       return res.json({
         product_name: base.product_name,
+        current_values: {
+          qty_sold: liveBase.qty_sold,
+          qty_remaining: liveBase.qty_remaining,
+          days_to_expiry:
+            liveBase.days_to_expiry < 9999
+              ? liveBase.days_to_expiry
+              : null,
+        },
         simulated_values: {
           qty_sold: simQtySold,
           qty_remaining: simRemaining,
           days_to_expiry:
             simDays < 9999 ? simDays : null,
         },
+        current_predictions: currentPredictions,
         predictions,
         recommendations,
       });
