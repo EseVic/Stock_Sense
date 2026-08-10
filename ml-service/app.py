@@ -10,13 +10,17 @@ import joblib
 import os
 import json
 
-from train import train_all_models, FEATURE_COLS
+from train import (
+    train_all_models,
+    FEATURE_COLS,
+    CUSTOMER_CATEGORICAL_FEATURES,
+)
 
 app = Flask(__name__)
 CORS(app)
 
 # Use this value to confirm that newly deployed version is active.
-SERVICE_VERSION = "expiry-rule-v4"
+SERVICE_VERSION = "phase1-preference-categorical-v4"
 
 MODELS = {}
 
@@ -121,39 +125,53 @@ def normalise_record(record):
     return clean
 
 
-def get_rule_based_expiry_label(record):
+def get_live_expiry_status(record):
     """
-    CHANGED: Main expiry bug fix.
+    Return the factual, current status derived from the product's live date.
 
-    Whether an item has expired is a factual date calculation.
-    It must not be guessed by a Decision Tree or Logistic Regression model.
-
-    The models still run for analysis, but this function controls
-    the final expiry label shown in the application.
+    The research classifier is still evaluated and returned for audit, but an
+    operational application must not call a product with 171 days remaining
+    "Expired" because a historical classifier favours its majority class.
     """
 
     if not record.get("has_expiry"):
-        return "N/A", 100.0
+        return "N/A"
 
-    days_left = safe_int(
-        record.get("days_to_expiry"),
-        9999,
-    )
+    days_left = safe_int(record.get("days_to_expiry"), 9999)
 
-    # Product expired before today.
     if days_left < 0:
-        return "Expired", 100.0
-
-    # Product expires today or within the next 7 days.
+        return "Expired"
     if days_left <= 7:
-        return "High", 100.0
-
-    # Product expires within 8 to 30 days.
+        return "High"
     if days_left <= 30:
-        return "Medium", 100.0
+        return "Medium"
+    return "Low"
 
-    # Product has more than 30 days remaining.
-    return "Low", 100.0
+
+def get_expiry_urgency(record):
+    """
+    Convert live days remaining into a 0-100 operational urgency score.
+
+    This is deliberately named urgency, not model confidence. It gives the
+    prediction card a meaningful visual scale without pretending a factual
+    date calculation has a probabilistic confidence.
+    """
+
+    if not record.get("has_expiry"):
+        return None
+
+    days_left = safe_int(record.get("days_to_expiry"), 9999)
+    shelf_life = max(safe_int(record.get("shelf_life_days"), 365), 1)
+
+    if days_left < 0:
+        return 100.0
+    if days_left <= 7:
+        return round(85 + ((7 - days_left) / 7) * 14, 1)
+    if days_left <= 30:
+        return round(50 + ((30 - days_left) / 23) * 34, 1)
+
+    remaining_fraction = min(max(days_left / shelf_life, 0), 1)
+    return round(max(5, 40 * (1 - remaining_fraction)), 1)
 
 
 def load_models():
@@ -210,6 +228,16 @@ def load_models():
                 f"{task}_features"
             ] = joblib.load(features_path)
 
+        preprocessor_path = (
+            f"{model_dir}/"
+            f"{task}_preprocessor.pkl"
+        )
+
+        if os.path.exists(preprocessor_path):
+            MODELS[
+                f"{task}_preprocessor"
+            ] = joblib.load(preprocessor_path)
+
     encoders_path = (
         f"{model_dir}/encoders.pkl"
     )
@@ -218,6 +246,12 @@ def load_models():
         MODELS["encoders"] = joblib.load(
             encoders_path
         )
+
+    metrics_path = f"{model_dir}/metrics.json"
+
+    if os.path.exists(metrics_path):
+        with open(metrics_path, encoding="utf-8") as file:
+            MODELS["metrics"] = json.load(file)
 
     print(
         f"Loaded {len(MODELS)} model objects"
@@ -345,19 +379,21 @@ def predict():
                 ):
                     row_result["predictions"][task] = {
                         "label": "N/A",
-                        "confidence": 100.0,
+                        "confidence": None,
 
                         "dt": {
                             "label": "N/A",
-                            "confidence": 100.0,
+                            "confidence": None,
                         },
 
                         "lr": {
                             "label": "N/A",
-                            "confidence": 100.0,
+                            "confidence": None,
                         },
 
-                        "rule_applied": True,
+                        "model": None,
+                        "not_applicable": True,
+                        "urgency": None,
 
                         "recommendation":
                             get_recommendation(
@@ -387,20 +423,37 @@ def predict():
 
                 for col in feat_cols:
                     if col not in task_df.columns:
-                        task_df[col] = 0
+                        task_df[col] = (
+                            "Unknown"
+                            if col in CUSTOMER_CATEGORICAL_FEATURES
+                            else 0
+                        )
 
-                x_frame = (
-                    task_df[feat_cols]
-                    .fillna(0)
+                x_frame = task_df[feat_cols].copy()
+                for col in feat_cols:
+                    if col in CUSTOMER_CATEGORICAL_FEATURES:
+                        x_frame[col] = (
+                            x_frame[col]
+                            .fillna("Unknown")
+                            .astype(str)
+                        )
+                    else:
+                        x_frame[col] = x_frame[col].fillna(0)
+
+                preprocessor = MODELS.get(
+                    f"{task}_preprocessor"
                 )
 
-                x_raw = x_frame.to_numpy()
-
-                x_scaled = (
-                    scaler.transform(x_frame)
-                    if scaler
-                    else x_raw
-                )
+                if preprocessor:
+                    x_raw = preprocessor.transform(x_frame)
+                    x_scaled = x_raw
+                else:
+                    x_raw = x_frame.to_numpy()
+                    x_scaled = (
+                        scaler.transform(x_frame)
+                        if scaler
+                        else x_raw
+                    )
 
                 dt_pred = None
                 lr_pred = None
@@ -459,26 +512,42 @@ def predict():
                         1,
                     )
 
-                primary = dt_pred or lr_pred
-
-                confidence = (
-                    dt_conf
-                    or lr_conf
-                    or 0
+                # Use the model selected during evaluation 
+                best_model = (
+                    MODELS.get("metrics", {})
+                    .get(task, {})
+                    .get("best_model", "Decision Tree")
                 )
 
-                rule_applied = False
-                # Keep DT and LR values for auditing, but use date rules
-                # for the final expiry label.
-                if task == "expiry_risk":
-                    (
-                        primary,
-                        confidence,
-                    ) = get_rule_based_expiry_label(
-                        record
+                if (
+                    best_model == "Logistic Regression"
+                    and lr_pred is not None
+                ):
+                    primary = lr_pred
+                    confidence = lr_conf or 0
+                    selected_model = "Logistic Regression"
+                else:
+                    primary = dt_pred if dt_pred is not None else lr_pred
+                    confidence = dt_conf if dt_pred is not None else (lr_conf or 0)
+                    selected_model = (
+                        "Decision Tree"
+                        if dt_pred is not None
+                        else "Logistic Regression"
                     )
 
-                    rule_applied = True
+                ml_assessment = None
+                urgency = None
+
+                if task == "expiry_risk":
+                    ml_assessment = {
+                        "label": primary,
+                        "confidence": confidence,
+                        "model": selected_model,
+                    }
+                    primary = get_live_expiry_status(record)
+                    confidence = None
+                    selected_model = "Live expiry date"
+                    urgency = get_expiry_urgency(record)
 
                 row_result["predictions"][task] = {
                     "label": primary,
@@ -495,7 +564,10 @@ def predict():
                         "confidence": lr_conf,
                     },
 
-                    "rule_applied": rule_applied,
+                    "model": selected_model,
+                    "not_applicable": False,
+                    "ml_assessment": ml_assessment,
+                    "urgency": urgency,
 
                     "recommendation":
                         get_recommendation(
@@ -517,10 +589,13 @@ def predict():
     except Exception as e:
         import traceback
 
+        # Keep the diagnostic on the server. Returning a Python stack trace to
+        # browsers exposes internal paths and implementation details.
+        traceback.print_exc()
+
         return jsonify(
             {
                 "error": str(e),
-                "trace": traceback.format_exc(),
             }
         ), 500
 

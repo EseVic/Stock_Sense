@@ -18,7 +18,9 @@ import pandas as pd
 
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     classification_report,
@@ -48,8 +50,6 @@ BASE_FEATURES = [
 
 TASK_FEATURES = {
     "expiry_risk": BASE_FEATURES + [
-        "days_to_expiry",
-        "shelf_utilisation",
         "weekly_sales_rate",
         "purchase_frequency",
         "total_units_sold_all",
@@ -66,8 +66,6 @@ TASK_FEATURES = {
         "days_to_expiry",
         "shelf_utilisation",
         "weekly_sales_rate",
-        "purchase_frequency",
-        "total_units_sold_all",
     ],
 
     "slow_mover": BASE_FEATURES + [
@@ -77,6 +75,17 @@ TASK_FEATURES = {
         "total_units_sold_all",
     ],
 }
+
+CUSTOMER_CATEGORICAL_FEATURES = [
+    "product_name",
+    "category",
+    "store_city",
+    "storage_temp",
+    "seasonality",
+    "kaggle_product_id",
+    "kaggle_store_id",
+    "kaggle_region",
+]
 
 
 FEATURE_COLS = sorted(
@@ -100,9 +109,9 @@ def load_data():
     """
     Load the StockSense inventory training dataset.
     """
-
     paths = [
         "data/StockSense-Inventory.csv",
+        "data/inventory_cleaned.csv",
     ]
 
     for path in paths:
@@ -212,6 +221,20 @@ def train_all_models():
 
     df = load_data()
 
+    expiry_distribution = (
+        df["expiry_risk"]
+        .astype(str)
+        .value_counts(normalize=True)
+    )
+    largest_expiry_share = float(expiry_distribution.max())
+
+    if largest_expiry_share > 0.80:
+        raise ValueError(
+            "Expiry training data is severely imbalanced "
+            f"({largest_expiry_share:.1%} in one class). "
+            "Use the audited augmented modelling table instead."
+        )
+
     encoders = {}
     all_metrics = {}
 
@@ -224,7 +247,13 @@ def train_all_models():
 
             continue
 
-        feat_cols = TASK_FEATURES[task]
+        numeric_feat_cols = TASK_FEATURES[task]
+        categorical_feat_cols = (
+            CUSTOMER_CATEGORICAL_FEATURES
+            if task == "customer_preference"
+            else []
+        )
+        feat_cols = numeric_feat_cols + categorical_feat_cols
 
         print(
             f"\n{'=' * 55}"
@@ -244,19 +273,21 @@ def train_all_models():
             f"{'=' * 55}"
         )
 
-        X = prepare_features(
+        X_numeric = prepare_features(
             df.copy(),
-            feat_cols,
+            numeric_feat_cols,
         )
 
-        scaler = StandardScaler()
-
-        X_scaled = scaler.fit_transform(X)
-
-        joblib.dump(
-            scaler,
-            f"models/{task}_scaler.pkl",
-        )
+        if categorical_feat_cols:
+            X = X_numeric.copy()
+            for col in categorical_feat_cols:
+                X[col] = (
+                    df[col].fillna("Unknown").astype(str)
+                    if col in df.columns
+                    else "Unknown"
+                )
+        else:
+            X = X_numeric
 
         label_encoder = LabelEncoder()
 
@@ -296,11 +327,50 @@ def train_all_models():
             stratify=y,
         )
 
-        X_train = X.values[train_indexes]
-        X_test = X.values[test_indexes]
+        X_train_frame = X.iloc[train_indexes]
+        X_test_frame = X.iloc[test_indexes]
 
-        X_scaled_train = X_scaled[train_indexes]
-        X_scaled_test = X_scaled[test_indexes]
+        if categorical_feat_cols:
+            # Fit the vocabulary and scaling on training rows only.
+            try:
+                one_hot = OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                )
+            except TypeError:
+                one_hot = OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse=False,
+                )
+
+            preprocessor = ColumnTransformer(
+                [
+                    ("numeric", StandardScaler(), numeric_feat_cols),
+                    ("categorical", one_hot, categorical_feat_cols),
+                ]
+            )
+            X_train = preprocessor.fit_transform(X_train_frame)
+            X_test = preprocessor.transform(X_test_frame)
+            X_scaled_train = X_train
+            X_scaled_test = X_test
+
+            joblib.dump(
+                preprocessor,
+                f"models/{task}_preprocessor.pkl",
+            )
+        else:
+            X_train = X_train_frame.to_numpy()
+            X_test = X_test_frame.to_numpy()
+
+            # Fit preprocessing on the training partition only.
+            scaler = StandardScaler()
+            X_scaled_train = scaler.fit_transform(X_train_frame)
+            X_scaled_test = scaler.transform(X_test_frame)
+
+            joblib.dump(
+                scaler,
+                f"models/{task}_scaler.pkl",
+            )
 
         y_train = y[train_indexes]
         y_test = y[test_indexes]
@@ -310,12 +380,40 @@ def train_all_models():
             f"| Test size: {len(y_test):,}"
         )
 
-        # Decision Tree model.
-        decision_tree = DecisionTreeClassifier(
-            max_depth=7,
+        # Fit the interpretable raw tree for feature-importance analysis.
+        tree_depth = 20 if task == "customer_preference" else 7
+        tree_class_weight = (
+            "balanced"
+            if task == "customer_preference"
+            else None
+        )
+
+        raw_decision_tree = DecisionTreeClassifier(
+            max_depth=tree_depth,
             min_samples_split=10,
             min_samples_leaf=5,
             random_state=42,
+            class_weight=tree_class_weight,
+        )
+
+        raw_decision_tree.fit(
+            X_train,
+            y_train,
+        )
+
+        # Calibrate the tree on training folds only. Raw tree leaf proportions
+        # were producing misleading 100% confidence values in the application.
+        decision_tree = CalibratedClassifierCV(
+            estimator=DecisionTreeClassifier(
+                max_depth=tree_depth,
+                min_samples_split=10,
+                min_samples_leaf=5,
+                random_state=42,
+                class_weight=tree_class_weight,
+            ),
+            method="sigmoid",
+            cv=5,
+            n_jobs=-1,
         )
 
         decision_tree.fit(
@@ -391,12 +489,25 @@ def train_all_models():
             f"models/{task}_dt.pkl",
         )
 
+        joblib.dump(
+            raw_decision_tree,
+            f"models/{task}_dt_raw.pkl",
+        )
+
         # Logistic Regression model.
         logistic_regression = LogisticRegression(
             max_iter=2000,
-            C=1.0,
+            # Customer preference has three similarly sized classes. Balanced
+            # weights improve minority-class macro F1 without reintroducing
+            # the purchase-frequency columns that created the target.
+            C=3.0 if task == "customer_preference" else 1.0,
             solver="lbfgs",
             random_state=42,
+            class_weight=(
+                "balanced"
+                if task == "customer_preference"
+                else None
+            ),
         )
 
         logistic_regression.fit(
@@ -487,6 +598,16 @@ def train_all_models():
         all_metrics[task] = {
             "features_used": feat_cols,
 
+            "class_distribution": {
+                str(label): int(count)
+                for label, count in (
+                    df[task]
+                    .astype(str)
+                    .value_counts()
+                    .items()
+                )
+            },
+
             "train_size": len(y_train),
 
             "test_size": len(y_test),
@@ -564,6 +685,13 @@ def train_all_models():
             },
 
             "best_model": winner,
+
+            "dataset": "StockSense-Inventory.csv (10,000 augmented scenarios)",
+
+            "confidence_calibration": {
+                "decision_tree": "5-fold sigmoid calibration on training data",
+                "logistic_regression": "native predict_proba",
+            },
 
             "classes": list(
                 label_encoder.classes_

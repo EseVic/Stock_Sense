@@ -4,6 +4,7 @@ const create_suppliers       = require("./003_create_suppliers");
 const create_purchase_orders = require("./004_create_purchase_orders");
 const create_sales_history   = require("./005_create_sales_history");
 const add_auth_tokens        = require("./006_add_auth_tokens");
+const add_prediction_details = require("./007_add_prediction_details");
 
 /**
  * Runs all migrations in order.
@@ -17,6 +18,7 @@ async function runMigrations(pool) {
   await create_purchase_orders(pool);
   await create_sales_history(pool);
   await add_auth_tokens(pool);
+  await add_prediction_details(pool);
   console.log("✅ All migrations complete");
 }
 

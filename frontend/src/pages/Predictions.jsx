@@ -69,7 +69,7 @@ function printPredictions(items) {
   w.document.write(html); w.document.close(); w.print()
 }
 
-// ── What-If Simulator ──────────────────────────────────────────────────────
+// ── Counterfactual Scenario Simulator ──────────────────────────────────────
 function WhatIfSimulator({ items }) {
   const [selectedId,  setSelectedId]  = useState('')
   const [qtySold,     setQtySold]     = useState('')
@@ -91,7 +91,11 @@ function WhatIfSimulator({ items }) {
       })
       setResult(res.data)
     } catch(e) {
-      setError('Simulation failed. Make sure the ML service is running.')
+      setError(
+        e.response?.data?.details ||
+        e.response?.data?.error ||
+        'Simulation failed. Make sure the ML service is running.'
+      )
     } finally {
       setRunning(false)
     }
@@ -99,12 +103,46 @@ function WhatIfSimulator({ items }) {
 
   const reset = () => { setResult(null); setError(null); setQtySold(''); setDaysLeft('') }
 
+  const comparisonRows = result ? [
+    { key:'expiry_risk', label:'Expiry risk', colorMap:RISK_COLOR },
+    { key:'sales_velocity', label:'Sales velocity', colorMap:VEL_COLOR },
+    { key:'customer_preference', label:'Preference', color:'#1B7A5A' },
+    { key:'slow_mover', label:'Slow mover', color:'#1B7A5A' },
+  ].map(row => {
+    const current = result.current_predictions?.[row.key] || {}
+    const simulated = result.predictions?.[row.key] || {}
+    const currentScore = row.key === 'expiry_risk' ? current.urgency : current.confidence
+    const simulatedScore = row.key === 'expiry_risk' ? simulated.urgency : simulated.confidence
+    const colorFor = value => row.colorMap
+      ? row.colorMap[value || '']
+      : row.key === 'slow_mover' && value === 'Yes' ? '#C0392B' : row.color
+    return {
+      ...row,
+      current,
+      simulated,
+      currentScore,
+      simulatedScore,
+      currentColor: colorFor(current.label),
+      simulatedColor: colorFor(simulated.label),
+      changed: current.label !== simulated.label,
+    }
+  }) : []
+
+  const changedRows = comparisonRows.filter(row => row.changed)
+  const valueDeltas = result ? [
+    { label:'Units sold', before:result.current_values?.qty_sold, after:result.simulated_values?.qty_sold },
+    { label:'Units remaining', before:result.current_values?.qty_remaining, after:result.simulated_values?.qty_remaining },
+    { label:'Days to expiry', before:result.current_values?.days_to_expiry, after:result.simulated_values?.days_to_expiry },
+  ].filter(delta => delta.before !== delta.after) : []
+
   return (
     <div className="whatif-box">
       <div className="whatif-header">
         <div>
-          <h3 className="whatif-title">🔮 What-If Simulator</h3>
-          <p className="whatif-sub">See how changes affect ML predictions before committing</p>
+          <h3 className="whatif-title">🔮 Counterfactual Scenario Simulator</h3>
+          <p className="whatif-sub">
+            Compare current predictions with a changed stock scenario. This is a point-in-time what-if analysis, not a multi-week digital-twin forecast.
+          </p>
         </div>
       </div>
 
@@ -150,7 +188,7 @@ function WhatIfSimulator({ items }) {
                   <label className="field-label">What if days to expiry were…</label>
                   <input
                     className="field-input"
-                    type="number" min="0"
+                    type="number" min="-3650"
                     placeholder={`Current: ${selected.days_to_expiry}`}
                     value={daysLeft}
                     onChange={e => { setDaysLeft(e.target.value); setResult(null) }}
@@ -175,19 +213,26 @@ function WhatIfSimulator({ items }) {
       {result && (
         <div className="whatif-result">
           <div className="wr-title">Simulation result for <strong>{selected?.product_name}</strong></div>
+
+          <div className="wr-input-deltas">
+            {valueDeltas.map(delta => (
+              <span key={delta.label} className="wr-delta-chip">
+                {delta.label}: <strong>{delta.before ?? '—'} → {delta.after ?? '—'}</strong>
+              </span>
+            ))}
+          </div>
+
           <div className="wr-compare">
 
             <div className="wr-col">
               <div className="wr-col-title">Current predictions</div>
-              {[
-                { label:'Expiry risk',    val: selected?.expiry_risk        || '—', color: RISK_COLOR[selected?.expiry_risk||''] },
-                { label:'Sales velocity', val: selected?.sales_velocity     || '—', color: VEL_COLOR[selected?.sales_velocity||''] },
-                { label:'Preference',     val: selected?.customer_preference|| '—', color: '#1B7A5A' },
-                { label:'Slow mover',     val: selected?.slow_mover         || '—', color: selected?.slow_mover==='Yes'?'#C0392B':'#1B7A5A' },
-              ].map(r => (
-                <div key={r.label} className="wr-row">
-                  <span className="wr-row-label">{r.label}</span>
-                  <span className="wr-badge" style={{background:r.color+'22', color:r.color}}>{r.val}</span>
+              {comparisonRows.map(row => (
+                <div key={row.key} className="wr-row">
+                  <span className="wr-row-label">{row.label}</span>
+                  <span className="wr-badge" style={{background:row.currentColor+'22', color:row.currentColor}}>
+                    {row.current.label || '—'}
+                    {row.currentScore != null && <small>{Number(row.currentScore).toFixed(1)}%</small>}
+                  </span>
                 </div>
               ))}
             </div>
@@ -196,18 +241,22 @@ function WhatIfSimulator({ items }) {
 
             <div className="wr-col wr-col-new">
               <div className="wr-col-title">Simulated predictions</div>
-              {[
-                { label:'Expiry risk',    val: result.predictions?.expiry_risk?.label        || '—', color: RISK_COLOR[result.predictions?.expiry_risk?.label||''] },
-                { label:'Sales velocity', val: result.predictions?.sales_velocity?.label     || '—', color: VEL_COLOR[result.predictions?.sales_velocity?.label||''] },
-                { label:'Preference',     val: result.predictions?.customer_preference?.label|| '—', color: '#1B7A5A' },
-                { label:'Slow mover',     val: result.predictions?.slow_mover?.label         || '—', color: result.predictions?.slow_mover?.label==='Yes'?'#C0392B':'#1B7A5A' },
-              ].map(r => (
-                <div key={r.label} className="wr-row">
-                  <span className="wr-row-label">{r.label}</span>
-                  <span className="wr-badge" style={{background:r.color+'22', color:r.color}}>{r.val}</span>
+              {comparisonRows.map(row => (
+                <div key={row.key} className={`wr-row${row.changed ? ' wr-row-changed' : ''}`}>
+                  <span className="wr-row-label">{row.label}</span>
+                  <span className="wr-badge" style={{background:row.simulatedColor+'22', color:row.simulatedColor}}>
+                    {row.simulated.label || '—'}
+                    {row.simulatedScore != null && <small>{Number(row.simulatedScore).toFixed(1)}%</small>}
+                  </span>
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className={`wr-change-summary ${changedRows.length ? 'has-change' : 'no-change'}`}>
+            {changedRows.length
+              ? `${changedRows.length} classification${changedRows.length > 1 ? 's' : ''} changed: ${changedRows.map(row => row.label).join(', ')}.`
+              : 'No classification changed because the simulated values stayed within the same decision bands. Confidence and stock quantities may still have changed.'}
           </div>
 
           {result.recommendations && (
@@ -233,6 +282,14 @@ function PredCard({ item, onPredict }) {
   const cp   = item.customer_preference||'—'
   const sm   = item.slow_mover||'—'
   const conf = item.prediction_confidence||0
+  const details = item.prediction_details || item.predictions || {}
+  const taskScore = (task) => {
+    const value = task === 'expiry_risk'
+      ? details?.[task]?.urgency
+      : details?.[task]?.confidence
+    return value == null ? null : Number(value)
+  }
+  const taskModel = (task) => details?.[task]?.model || '—'
 
   const isBad  = er==='High'||er==='Expired'||sm==='Yes'
   const isGood = er==='Low'&&sv==='Fast'&&cp==='High'
@@ -273,15 +330,15 @@ function PredCard({ item, onPredict }) {
         <div className="pred-body">
           <div className="pred-gauges">
             {[
-              { label:'Expiry risk',     val:conf,                              color:RISK_COLOR[er] },
-              { label:'Sales velocity',  val:sv==='Fast'?85:sv==='Moderate'?55:20, color:VEL_COLOR[sv] },
-              { label:'Customer demand', val:cp==='High'?90:cp==='Medium'?55:20,   color:'#1B7A5A' },
-              { label:'Slow mover risk', val:sm==='Yes'?85:20,                  color:sm==='Yes'?'#C0392B':'#1B7A5A' },
+              { task:'expiry_risk', label:'Expiry urgency', val:taskScore('expiry_risk'), color:RISK_COLOR[er] },
+              { task:'sales_velocity', label:'Sales velocity', val:taskScore('sales_velocity'), color:VEL_COLOR[sv] },
+              { task:'customer_preference', label:'Customer demand', val:taskScore('customer_preference'), color:'#1B7A5A' },
+              { task:'slow_mover', label:'Slow mover risk', val:taskScore('slow_mover'), color:sm==='Yes'?'#C0392B':'#1B7A5A' },
             ].map(g=>(
               <div key={g.label} className="gauge-row">
-                <span className="gauge-label">{g.label}</span>
+                <span className="gauge-label" title={`Selected model: ${taskModel(g.task)}`}>{g.label}</span>
                 <GaugeBar value={g.val} color={g.color} />
-                <span className="gauge-val" style={{color:g.color}}>{Math.round(g.val)}%</span>
+                <span className="gauge-val" style={{color:g.color}}>{g.val != null ? `${g.val.toFixed(1)}%` : '—'}</span>
               </div>
             ))}
           </div>
@@ -293,7 +350,7 @@ function PredCard({ item, onPredict }) {
             </div>
           )}
           <div className="pred-meta">
-            <span>Confidence: <strong>{conf}%</strong></span>
+            <span>Expiry source: <strong>{taskModel('expiry_risk')}</strong></span>
             <span>Days to expiry: <strong>{formatDaysToExpiry(item.days_to_expiry)}</strong></span>
             <span>Sell-through: <strong>{item.sell_through_rate!=null?(item.sell_through_rate*100).toFixed(1)+'%':'—'}</strong></span>
             <span>Weekly sales rate: <strong>{item.weekly_sales_rate!=null?Number(item.weekly_sales_rate).toFixed(2)+'/wk':'—'}</strong></span>
@@ -367,7 +424,7 @@ export default function Predictions() {
             className="icon-btn"
             style={showSim?{background:'var(--green)',color:'#fff'}:{}}
             onClick={() => setShowSim(!showSim)}
-            title="What-If Simulator"
+            title="Counterfactual Scenario Simulator"
           >
             🔮 Simulator
           </button>
