@@ -122,11 +122,6 @@
 .empty-metrics code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 /* ════ DARK MODE ════ */
-/* The classes below match what ModelMetrics.jsx actually renders
-   (.overview-card / .task-card / .mm-label / .class-table etc) —
-   the previous block here targeted .metrics-card / .metrics-table /
-   .metrics-label, none of which exist in this file, so none of it
-   ever applied. */
 html.app-dark .overview-card,
 html.app-dark .task-card { background:#161b22 !important; box-shadow:none !important; }
 
