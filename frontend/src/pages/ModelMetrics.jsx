@@ -74,12 +74,12 @@ function TaskCard({ task, data }) {
 
       <div className="task-body">
         {/* Summary metrics */}
-        <p className="metrics-explanation">
+        {/* <p className="metrics-explanation">
           Evaluated on a stratified 70/30 split of the augmented modelling data.
           Decision Tree probabilities use five-fold sigmoid calibration, so confidence is not raw leaf purity.
           Summary precision, recall and macro F1 give every class equal importance; the per-class table below shows where errors occur.
           Green is at least 80%, amber is 70-79.9%, and red is below 70%; these colours report performance and do not change the scores.
-        </p>
+        </p> */}
         <div className="model-compare">
           {[['Decision Tree', dt, 'dt'], ['Logistic Regression', lr, 'lr']].map(([name, m, key]) => (
             <div key={key} className={`model-col${winner===name?' model-winner':''}`}>
